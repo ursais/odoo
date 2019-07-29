@@ -856,12 +856,7 @@ class IrModelFields(models.Model):
                 self.pool.post_init(record.modified, keys)
                 old_vals.update(new_vals)
             if module and (module == model._original_module or module in field._modules):
-                # remove this and only keep the else clause if version >= saas-12.4
-                if field.manual:
-                    self.pool.loaded_xmlids.add(
-                        '%s.field_%s__%s' % (module, model._name.replace('.', '_'), name))
-                else:
-                    to_xmlids.append(name)
+                to_xmlids.append(name)
 
         if to_insert:
             # insert missing fields
