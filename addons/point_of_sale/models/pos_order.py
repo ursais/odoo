@@ -236,7 +236,7 @@ class PosOrder(models.Model):
         # We convert a new id object back to a dictionary to write to
         # bridge between old and new api
         inv_line = invoice_line._convert_to_write({name: invoice_line[name] for name in invoice_line._cache})
-        inv_line.update(price_unit=line.price_unit, discount=line.discount, name=inv_name)
+        inv_line.update(price_unit=line.price_unit, discount=line.discount)
         return InvoiceLine.sudo().create(inv_line)
 
     def _create_account_move_line(self, session=None, move=None):
@@ -867,7 +867,7 @@ class PosOrder(models.Model):
                             # a serialnumber always has a quantity of 1 product, a lot number takes the full quantity of the order line
                             qty = 1.0
                             if stock_production_lot.product_id.tracking == 'lot':
-                                qty = pos_pack_lot.pos_order_line_id.qty
+                                qty = abs(pos_pack_lot.pos_order_line_id.qty)
                             qty_done += qty
                             pack_lots.append({'lot_id': stock_production_lot.id, 'qty': qty})
                         else:

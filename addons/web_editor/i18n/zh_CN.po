@@ -447,7 +447,7 @@ msgstr "显示名称"
 #: code:addons/web_editor/static/src/xml/editor.xml:57
 #, python-format
 msgid "Document"
-msgstr "单据"
+msgstr "文档"
 
 #. module: web_editor
 #. openerp-web
@@ -1171,7 +1171,7 @@ msgstr "移除字体样式"
 #: code:addons/web_editor/static/src/js/editor/rte.summernote.js:1012
 #, python-format
 msgid "Remove Image"
-msgstr "删除图像"
+msgstr "移除图像"
 
 #. module: web_editor
 #. openerp-web

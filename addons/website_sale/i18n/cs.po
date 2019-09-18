@@ -180,7 +180,7 @@ msgstr "<b>Vaše objednávka: </b>"
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.payment
 msgid "<i class=\"fa fa-arrow-right\"/> Add payment acquirers"
-msgstr ""
+msgstr "<i class=\"fa fa-arrow-right\"/> Přidat příjemce platby"
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.address_kanban
@@ -193,6 +193,8 @@ msgid ""
 "<i class=\"fa fa-chevron-left\"/>\n"
 "                                            <span>Back</span>"
 msgstr ""
+"<i class=\"fa fa-chevron-left\"/>\n"
+"                                            <span>Zpět</span>"
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.checkout
@@ -200,6 +202,8 @@ msgid ""
 "<i class=\"fa fa-chevron-left\"/>\n"
 "                                    <span>Return to Cart</span>"
 msgstr ""
+"<i class=\"fa fa-chevron-left\"/>\n"
+"                                    <span>Zpět do Košíku</span>"
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.payment
@@ -372,7 +376,7 @@ msgstr "<strong>Přidat do košíku</strong>"
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.confirmation
 msgid "<strong>Payment Information:</strong>"
-msgstr ""
+msgstr "<strong>Platební informace:</strong>"
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.confirmation
@@ -738,7 +742,7 @@ msgstr "Podřízené kategorie"
 #. module: website_sale
 #: model:ir.actions.act_window,name:website_sale.action_open_website_sale_onboarding_payment_acquirer_wizard
 msgid "Choose a payment method"
-msgstr ""
+msgstr "Zvolte způsob platby"
 
 #. module: website_sale
 #: model:product.pricelist,name:website_sale.list_christmas
@@ -1125,7 +1129,7 @@ msgstr "Vytvořit fakturu z objednávek připravených k fakturaci."
 #: model_terms:ir.ui.view,arch_db:website_sale.res_config_settings_view_form
 msgid ""
 "Generate the invoice automatically when the online payment is confirmed"
-msgstr ""
+msgstr "Fakturu vygenerujte automaticky při potvrzení platby online"
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.extra_info
@@ -1561,7 +1565,7 @@ msgstr "Objednávky"
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.res_config_settings_view_form
 msgid "Orders Followup"
-msgstr ""
+msgstr "Následné kroky Objednávek"
 
 #. module: website_sale
 #: model:ir.actions.act_window,name:website_sale.sale_order_action_to_invoice
@@ -1768,7 +1772,7 @@ msgstr "Nástroj pro porovnání produktů"
 #. module: website_sale
 #: model:ir.model,name:website_sale.model_product_image
 msgid "Product Image"
-msgstr ""
+msgstr "Obrázek produktu"
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.product_template_form_view
@@ -1923,7 +1927,7 @@ msgstr "Omezit publikování na tomto webu."
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.payment
 msgid "Return to Cart"
-msgstr ""
+msgstr "Zpět do Košíku"
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.404
@@ -2044,7 +2048,7 @@ msgstr "Prodáváme obsah ke stažení nebo odkazy na URL"
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.res_config_settings_view_form
 msgid "Sell in several currencies"
-msgstr ""
+msgstr "Prodej v několika měnách"
 
 #. module: website_sale
 #: model:ir.actions.server,name:website_sale.ir_actions_server_sale_cart_recovery_email
@@ -2395,7 +2399,7 @@ msgstr ""
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.product
 msgid "This product is no longer available."
-msgstr ""
+msgstr "Tento produkt již není k dispozici."
 
 #. module: website_sale
 #: model_terms:ir.ui.view,arch_db:website_sale.products_item

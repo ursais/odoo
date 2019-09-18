@@ -99,6 +99,10 @@ msgid ""
 "attrs=\"{'invisible': [('is_blacklisted', '=', False)]}\" "
 "groups=\"base.group_user\"/>"
 msgstr ""
+"<i class=\"fa fa-ban\" style=\"color: red;\" role=\"img\" title=\"tento "
+"e-mail byl vyřazen z hromadné pošty\" aria-label=\"Blacklisted\" "
+"attrs=\"{'invisible': [('is_blacklisted', '=', False)]}\" "
+"groups=\"base.group_user\"/>"
 
 #. module: crm
 #: model_terms:ir.ui.view,arch_db:crm.view_crm_lead_kanban
@@ -1108,6 +1112,8 @@ msgid ""
 "If the email address is on the blacklist, the contact won't receive mass "
 "mailing anymore, from any list"
 msgstr ""
+"Pokud je e-mailová adresa na černé listině, kontakt už nebude dostávat "
+"hromadnou poštu z jakéhokoli seznamu"
 
 #. module: crm
 #: model:ir.model.fields,help:crm.field_crm_lead2opportunity_partner_mass__force_assignation
@@ -1953,7 +1959,7 @@ msgstr "Nabídka"
 #. module: crm
 #: model:ir.model.fields,field_description:crm.field_crm_lead__expected_revenue
 msgid "Prorated Revenue"
-msgstr ""
+msgstr "Přiznané příjmy"
 
 #. module: crm
 #: model:crm.stage,name:crm.stage_lead2
@@ -2277,7 +2283,7 @@ msgstr "Štítek"
 #. module: crm
 #: sql_constraint:crm.lead.tag:0
 msgid "Tag name already exists !"
-msgstr ""
+msgstr "Název značky již existuje!"
 
 #. module: crm
 #: model:ir.actions.act_window,name:crm.crm_lead_tag_action
@@ -2559,7 +2565,7 @@ msgstr "Uživatelé"
 #. module: crm
 #: selection:crm.lead,priority:0
 msgid "Very High"
-msgstr ""
+msgstr "Velmi vysoko"
 
 #. module: crm
 #: model:crm.lost.reason,name:crm.lost_reason_2
@@ -2697,8 +2703,8 @@ msgstr ""
 #. module: crm
 #: model_terms:ir.ui.view,arch_db:crm.crm_case_form_view_leads
 #: model_terms:ir.ui.view,arch_db:crm.crm_case_form_view_oppor
-msgid "e.g. www.odoo.com"
-msgstr "např. www.odoo.com"
+msgid "e.g. https://www.odoo.com"
+msgstr "např. https://www.odoo.com"
 
 #. module: crm
 #: code:addons/crm/models/crm_lead.py:946
