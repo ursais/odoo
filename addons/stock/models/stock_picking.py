@@ -67,7 +67,7 @@ class PickingType(models.Model):
         # TDE TODO: true multi
         tristates = []
         for picking in self.env['stock.picking'].search([('picking_type_id', '=', self.id), ('state', '=', 'done')], order='date_done desc', limit=10):
-            if picking.date_done > picking.date:
+            if picking.date_done and picking.date and picking.date_done > picking.date:
                 tristates.insert(0, {'tooltip': picking.name or '' + ": " + _('Late'), 'value': -1})
             elif picking.backorder_id:
                 tristates.insert(0, {'tooltip': picking.name or '' + ": " + _('Backorder exists'), 'value': 0})
