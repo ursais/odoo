@@ -457,7 +457,15 @@ class Partner(models.Model):
                 self.update_address(onchange_vals)
 
         # 2. To DOWNSTREAM: sync children
-        if self.child_ids:
+        skip = True
+        if 'sale' in self.env.context and self.env.context.get('sale',False):
+            skip = False
+        else:
+            if self.child_ids:
+                skip = True
+            else:
+                skip = False
+        if skip:
             # 2a. Commercial Fields: sync if commercial entity
             if self.commercial_partner_id == self:
                 commercial_fields = self._commercial_fields()
