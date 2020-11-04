@@ -163,7 +163,7 @@ class MrpStockReport(models.TransientModel):
         data = [{
             'level': level,
             'unfoldable': unfoldable,
-            'date': move_line.move_id.date,
+            'date': move_line.move_id.date or move_line.date,
             'parent_id': parent_id,
             'model_id': move_line.id,
             'model':'stock.move.line',
