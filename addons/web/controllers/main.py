@@ -103,6 +103,7 @@ db_list = http.db_list
 
 db_monodb = http.db_monodb
 
+def clean(name): return name.replace('\x3c', '')
 def serialize_exception(f):
     @functools.wraps(f)
     def wrap(*args, **kwargs):
@@ -116,7 +117,7 @@ def serialize_exception(f):
                 'message': "Odoo Server Error",
                 'data': se
             }
-            return werkzeug.exceptions.InternalServerError(json.dumps(error))
+            return werkzeug.exceptions.InternalServerError(json.dumps(clean(error)))
     return wrap
 
 def redirect_with_hash(*args, **kw):
@@ -1521,12 +1522,12 @@ class Binary(http.Controller):
                 _logger.exception("Fail to upload attachment %s" % ufile.filename)
             else:
                 args.append({
-                    'filename': filename,
+                    'filename': clean(filename),
                     'mimetype': ufile.content_type,
                     'id': attachment.id,
                     'size': attachment.file_size
                 })
-        return out % (json.dumps(callback), json.dumps(args))
+        return out % (json.dumps(clean(callback)), json.dumps(clean(args)))
 
     @http.route([
         '/web/binary/company_logo',
