@@ -21,7 +21,7 @@ from types import CodeType
 import logging
 import werkzeug
 
-from .misc import ustr
+from . import ustr, pycompat
 
 import odoo
 

@@ -136,6 +136,7 @@ def main(args):
         for db_name in preload:
             try:
                 odoo.service.db._create_empty_database(db_name)
+                config['init']['base'] = True
             except odoo.service.db.DatabaseExists:
                 pass
 
