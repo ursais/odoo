@@ -335,6 +335,9 @@ def safe_eval(expr, globals_dict=None, locals_dict=None, mode="eval", nocopy=Fal
         if locals_dict is not None:
             locals_dict = dict(locals_dict)
 
+    wrap_values(globals_dict)
+    wrap_values(locals_dict)
+
     if globals_dict is None:
         globals_dict = {}
 
