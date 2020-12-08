@@ -24,9 +24,7 @@ import logging
 import sys
 import werkzeug
 
-from . import pycompat
-from .misc import ustr
-from . import pycompat
+from . import ustr, pycompat, wrap_values
 
 import odoo
 
