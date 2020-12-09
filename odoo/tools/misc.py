@@ -1263,8 +1263,8 @@ def wrap_module(module, attr_list):
                 target = wrap_module(target, attr_list)
             else:
                 target = wrapper
-                setattr(self, attrib, target)
-        return target
+            setattr(self, attrib, target)
+            return target
     # module and attr_list are in the closure
     wrapper = WrappedModule()
     _cache.setdefault(module, wrapper)
