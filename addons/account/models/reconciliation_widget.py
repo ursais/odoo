@@ -449,10 +449,9 @@ class AccountReconciliation(models.AbstractModel):
         """
 
         domain_reconciliation = [
-            '&', '&',
+            '&',
             ('statement_line_id', '=', False),
-            ('account_id', 'in', aml_accounts),
-            ('payment_id', '<>', False)
+            ('account_id', 'in', aml_accounts)
         ]
 
         # default domain matching
