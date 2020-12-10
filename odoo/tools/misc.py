@@ -1257,14 +1257,14 @@ def wrap_module(module, attr_list):
             target = getattr(module, attrib)
             if isinstance(target, types.ModuleType):
                 wrapper = _cache.get(target, _missing)
-            if wrapper is None:
-                raise AttributeError(attrib)
-            if wrapper is _missing:
-                target = wrap_module(target, attr_list)
-            else:
-                target = wrapper
-                setattr(self, attrib, target)
-        return target
+                if wrapper is None:
+                    raise AttributeError(attrib)
+                if wrapper is _missing:
+                    target = wrap_module(target, attr_list)
+                else:
+                    target = wrapper
+            setattr(self, attrib, target)
+            return target
     # module and attr_list are in the closure
     wrapper = WrappedModule()
     _cache.setdefault(module, wrapper)
