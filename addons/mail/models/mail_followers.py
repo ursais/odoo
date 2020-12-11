@@ -48,7 +48,6 @@ class Followers(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        res = super(Followers, self).create(vals_list)
         res = super(Followers, self).create(vals_list)._check_rights()
         res._invalidate_documents()
         return res
