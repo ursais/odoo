@@ -233,10 +233,11 @@ class Channel(models.Model):
             defaults = self.default_get(['image'])
             vals['image'] = defaults['image']
 
+        tools.image_resize_images(vals)
+
         # always add the current user to the channel
         vals['channel_partner_ids'] = vals.get('channel_partner_ids', []) + [(4, self.env.user.partner_id.id)]
 
-        tools.image_resize_images(vals)
         # Create channel and alias
         channel = super(Channel, self.with_context(
             alias_model_name=self._name, alias_parent_model_name=self._name, mail_create_nolog=True, mail_create_nosubscribe=True)
