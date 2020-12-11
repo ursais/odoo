@@ -35,10 +35,14 @@ class StockChangeStandardPrice(models.TransientModel):
     def change_price(self):
         """ Changes the Standard Price of Product and creates an account move accordingly. """
         self.ensure_one()
-        if self._context['active_model'] == 'product.template':
-            products = self.env['product.template'].browse(self._context['active_id']).product_variant_ids
+        if self._context.get('active_model') != self._context.get('model'):
+            active_id = self._context['active_ids'][0]
         else:
-            products = self.env['product.product'].browse(self._context['active_id'])
+            active_id = self._context['active_id']
+        if self._context.get('active_model') == 'product.template':
+            products = self.env['product.template'].browse(active_id).product_variant_ids
+        else:
+            products = self.env['product.product'].browse(active_id)
 
         products.do_change_standard_price(self.new_price, self.counterpart_account_id.id)
         return {'type': 'ir.actions.act_window_close'}
