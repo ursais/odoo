@@ -1244,7 +1244,6 @@ def wrap_module(module, attr_list):
             attributes and their own main attributes. No support for hiding attributes in case
             of name collision at different levels.
     """
-
     wrapper = _cache.get(module)
     if wrapper:
         return wrapper
