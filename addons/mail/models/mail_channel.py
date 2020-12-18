@@ -409,7 +409,7 @@ class Channel(models.Model):
         if moderation_status == 'rejected':
             return self.env['mail.message']
 
-        self.filtered(lambda channel: channel.is_chat).mapped('channel_last_seen_partner_ids').sudo().write({'is_pinned': True})
+        self.filtered(lambda channel: channel.channel_type == 'chat').mapped('channel_last_seen_partner_ids').sudo().write({'is_pinned': True})
 
         message = super(Channel, self.with_context(mail_create_nosubscribe=True)).message_post(message_type=message_type, moderation_status=moderation_status, **kwargs)
 
