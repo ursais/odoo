@@ -530,9 +530,9 @@ function on_partner_notification (data) {
         if (channel) {
             var msg;
             if (_.contains(['public', 'private'], channel.type)) {
-                msg = _.str.sprintf(_t('You unsubscribed from <b>%s</b>.'), channel.name);
+                msg = _.str.sprintf(_t('You unsubscribed from <b>%s</b>.'), _.escape(channel.name));
             } else {
-                msg = _.str.sprintf(_t('You unpinned your conversation with <b>%s</b>.'), channel.name);
+                msg = _.str.sprintf(_t('You unpinned your conversation with <b>%s</b>.'), _.escape(channel.name));
             }
             remove_channel(channel);
             chat_manager.bus.trigger("unsubscribe_from_channel", data.id);

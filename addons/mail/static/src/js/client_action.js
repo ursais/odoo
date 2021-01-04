@@ -343,7 +343,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
 
         this.$('.o_mail_add_channel[data-type=dm]').find("input").autocomplete({
             source: function(request, response) {
-                self.last_search_val = _.escape(request.term);
+                self.last_search_val = request.term;
                 chat_manager.search_partner(self.last_search_val, 10).done(response);
             },
             select: function(event, ui) {
@@ -364,7 +364,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
         });
 
         this.$('.o_mail_add_channel[data-type=private]').find("input").on('keyup', this, function (event) {
-            var name = _.escape($(event.target).val());
+            var name = $(event.target).val();
             if(event.which === $.ui.keyCode.ENTER && name) {
                 chat_manager.create_channel(name, "private");
             }
@@ -658,7 +658,7 @@ var ChatAction = Widget.extend(ControlPanelMixin, {
     },
 
     on_click_button_invite: function () {
-        var title = _.str.sprintf(_t('Invite people to #%s'), this.channel.name);
+        var title = _.str.sprintf(_t('Invite people to #%s'), _.escape(this.channel.name));
         new PartnerInviteDialog(this, title, this.channel.id).open();
     },
 

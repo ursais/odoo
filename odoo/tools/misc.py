@@ -39,7 +39,7 @@ except ImportError:
 
 from config import config
 from cache import *
-from .parse_version import parse_version 
+from .parse_version import parse_version
 
 import odoo
 # get_encodings, ustr and exception_to_unicode were originally from tools.misc.
@@ -885,7 +885,7 @@ class unquote(str):
         return self
 
 class UnquoteEvalContext(defaultdict):
-    """Defaultdict-based evaluation context that returns 
+    """Defaultdict-based evaluation context that returns
        an ``unquote`` string for any missing name used during
        the evaluation.
        Mostly useful for evaluating OpenERP domains/contexts that
