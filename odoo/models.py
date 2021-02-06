@@ -34,7 +34,7 @@ import pytz
 import re
 import uuid
 from collections import defaultdict, MutableMapping, OrderedDict
-from contextlib import closing
+from contextlib import closing, contextmanager
 from inspect import getmembers, currentframe
 from operator import attrgetter, itemgetter
 
@@ -668,19 +668,28 @@ class BaseModel(MetaModel('DummyModel', (object,), {'_register': False})):
             for r in missing
         )
         fields = ['module', 'model', 'name', 'res_id']
-        cr.copy_from(io.StringIO(
-            u'\n'.join(
-                u"%s\t%s\t%s\t%d" % (
-                    modname,
-                    record._name,
-                    xids[record.id][1],
-                    record.id,
-                )
-                for record in missing
-            )),
-            table='ir_model_data',
-            columns=fields,
-        )
+        @contextmanager
+        def _paused_thread():
+            try:
+                thread = psycopg2.extensions.get_wait_callback()
+                psycopg2.extensions.set_wait_callback(None)
+                yield
+            finally:
+                psycopg2.extensions.set_wait_callback(thread)
+        with _paused_thread():
+            cr.copy_from(io.StringIO(
+                u'\n'.join(
+                    u"%s\t%s\t%s\t%d" % (
+                        modname,
+                        record._name,
+                        xids[record.id][1],
+                        record.id,
+                    )
+                    for record in missing
+                )),
+                table='ir_model_data',
+                columns=fields,
+            )
         self.env['ir.model.data'].invalidate_cache(fnames=fields)
 
         return (
