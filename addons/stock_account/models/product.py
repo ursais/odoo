@@ -221,6 +221,15 @@ class ProductProduct(models.Model):
                     elif product.product_tmpl_id.valuation == 'real_time':
                         valuation_account_id = product.categ_id.property_stock_valuation_account_id.id
                         value, quantity, aml_ids = fifo_automated_values.get((product.id, valuation_account_id)) or (0, 0, [])
+                        domain = [('product_id', '=', product.id), ('date', '<=', to_date)] + StockMove._get_all_base_domain()
+                        moves = StockMove.search(domain)
+                        qty_at_date = product.with_context(company_owned=True, owner_id=False).qty_available
+                        if len(moves):
+                            value = sum(moves.mapped('remaining_value'))
+                            qty = sum(moves.mapped('remaining_qty'))
+                            if qty != qty_at_date:
+                                value = sum(a*b for a, b in zip(moves.mapped('price_unit'),moves.mapped('product_qty')))
+                                quantity = qty_at_date
                         product.stock_value = value
                         product.qty_at_date = quantity
                         product.stock_fifo_real_time_aml_ids = self.env['account.move.line'].browse(aml_ids)
