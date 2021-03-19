@@ -57,7 +57,7 @@ class OAuthLogin(Home):
         except Exception:
             providers = []
         for provider in providers:
-            return_url = request.httprequest.url_root + 'auth_oauth/signin'
+            return_url = request.httprequest.url_root.replace("http://", "https://") + 'auth_oauth/signin'
             state = self.get_state(provider)
             params = dict(
                 response_type='token',
