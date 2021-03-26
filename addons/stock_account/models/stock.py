@@ -322,7 +322,7 @@ class StockMove(models.Model):
                 'price_unit': price_unit,
             })
         elif qty_to_take_on_candidates > 0:
-            last_fifo_price = new_standard_price or move.product_id.standard_price
+            last_fifo_price = new_standard_price or move.price_unit or move.product_id.standard_price
             negative_stock_value = last_fifo_price * -qty_to_take_on_candidates
             tmp_value += abs(negative_stock_value)
             vals = {
