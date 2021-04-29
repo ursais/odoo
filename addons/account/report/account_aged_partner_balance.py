@@ -153,11 +153,11 @@ class ReportAgedPartnerBalance(models.AbstractModel):
                     if partial_line.create_date[:10] <= date_from:
                         line_amount -= ResCurrency._compute(partial_line.company_id.currency_id, user_currency, partial_line.amount)
 
-                if not self.env.user.company_id.currency_id.is_zero(line_amount):
+                if partner_id and not self.env.user.company_id.currency_id.is_zero(line_amount):
                     partners_amount[partner_id] += line_amount
                     lines[partner_id].append({
                         'line': line,
-                        'amount': line_amount,
+                        'amount': line_amount or 0,
                         'period': i + 1,
                         })
             history.append(partners_amount)
