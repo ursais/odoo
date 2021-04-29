@@ -577,7 +577,7 @@ class AccountBankStatementLine(models.Model):
             domain_matching = expression.AND([domain_matching, [('account_id.reconcile', '=', True)]])
 
         # Let's add what applies to both
-        domain = expression.OR([domain_reconciliation, domain_matching])
+        domain = expression.AND([domain_reconciliation, domain_matching])
         if self.partner_id.id and not overlook_partner:
             domain = expression.AND([domain, [('partner_id', '=', self.partner_id.id)]])
 
@@ -602,7 +602,7 @@ class AccountBankStatementLine(models.Model):
         from_clause = "FROM account_move_line aml JOIN account_account acc ON acc.id = aml.account_id "
         account_clause = ''
         if self.journal_id.default_credit_account_id and self.journal_id.default_debit_account_id:
-            account_clause = "(aml.statement_id IS NULL AND aml.account_id IN %(account_payable_receivable)s) OR"
+            account_clause = "(aml.statement_id IS NULL AND aml.account_id IN %(account_payable_receivable)s) AND"
         where_clause = """WHERE aml.company_id = %(company_id)s
                           AND (
                                     """ + account_clause + """
