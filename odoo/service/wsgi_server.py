@@ -29,6 +29,9 @@ from odoo.tools import config
 
 _logger = logging.getLogger(__name__)
 
+_handler_clazz = werkzeug.serving.WSGIRequestHandler
+_handler_clazz.address_string = lambda self: self.headers['x-forwarded-for'] if config['proxy_mode'] and 'x-forwarded-for' in self.headers else self.client_address[0]
+
 # XML-RPC fault codes. Some care must be taken when changing these: the
 # constants are also defined client-side and must remain in sync.
 # User code must use the exceptions defined in ``odoo.exceptions`` (not
