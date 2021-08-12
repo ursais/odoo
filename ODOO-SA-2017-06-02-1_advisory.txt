@@ -1,0 +1,88 @@
+Odoo Security Advisory                   ODOO-SA-2017-06-02-1
+
+Title: Local file disclosure
+
+Affects: Odoo 8.0, 9.0, 10.0 (Community and Enterprise Editions)
+Component: Core
+Credits: Karim Boukabbouz from IBS North Africa and Nils Hamerlinck
+
+
+I.   Background
+
+The Odoo framework exposes an API to access files included within any
+modules. This API is used for loading resources, images or source code.
+
+The Odoo core includes features such as reports and menus that require
+files accessed through this API. In some cases, these features allow
+users or administrators to control the file paths to use.
+
+
+II.  Problem Description
+
+This file access API (tools.file_open) did not properly sanitize the
+requested file paths, and could grant access to files that did not
+belong to Odoo modules.
+
+
+III. Impact
+
+Attack Vector: Network exploitable
+Authentication: Required
+CVSS3 Score: High :: 7.7
+CVSS3 Vector: AV:N/AC:L/PR:L/UI:N/S:C/C:H/I:N/A:N
+
+Malicious users may trick some of the components accessing this API
+to request arbitrary files from the local filesystem on which Odoo is
+running. At least one of these components can be used without requiring
+elevated privileges (a normal user access is sufficient).
+
+This could allow an attacker to read any local file that is currently
+readable with the system privileges of the Odoo service.
+This could include sensitive files containing passwords, etc.
+
+Odoo S.A. is not aware of any malicious use if this vulnerability yet,
+but the vulnerability was publicly disclosed by a 3rd party without
+coordination with Odoo S.A.
+
+
+IV.  Workaround
+
+Attackers exploiting this vulnerability can only access files readable
+by the system user executing Odoo. Sensitive files might therefore be
+protected by using filesystem-level permissions to block access to the
+Odoo user.
+It is very hard to effectively secure a system in this manner, so
+applying the patch or updating is strongly recommended.
+
+Odoo Online servers have been patched as soon as the vulnerability was
+announced.
+
+
+V.   Solution
+
+Apply the patches corresponding to your Odoo installation, or upgrade
+to the latest revision, either via GitHub or by downloading the
+latest version from https://www.odoo.com/page/download
+or http://nightly.odoo.com
+
+To apply the patch, change into the main directory of your Odoo
+installation (the one containing "openerp" or "odoo", and "addons"
+directories), then execute the patch command, typically:
+
+       patch -p0 -f < /path/to/the_patch_file.patch
+
+This command assumes your installation layout corresponds to
+the latest source code layout of the Odoo project on GitHub.
+If your installation differs, please extract the various patch
+hunks from the files and apply them in the appropriate locations.
+
+
+VI.  Correction details
+
+The following list contains the revisions after which the vulnerability
+is corrected:
+
+- 8.0:  d18d606a55330a6b9fd19596d8b12c4e9e0a4b57
+- 9.0:  98f5f1b888415be018467c6646f4e05301c001c2
+- 10.0: 76cd8d2558d2a1fc11681dbc4a134ba06fb698c0
+- 10.0-ent and 9.0-ent (Enterprise): see 9.0 and 10.0.

@@ -1,0 +1,13 @@
+diff --git odoo/http.py odoo/http.py
+index cef63e8..94ec3b8 100644
+--- odoo/http.py
++++ odoo/http.py
+@@ -163,6 +163,8 @@ def redirect_with_hash(url, code=303):
+     # See extensive test page at http://greenbytes.de/tech/tc/httpredirects/
+     if request.httprequest.user_agent.browser in ('firefox',):
+         return werkzeug.utils.redirect(url, code)
++    if urlparse.urlparse(url, scheme='http').scheme not in ('http', 'https'):
++        url = 'http://' + url
+     url = url.replace("'", "%27").replace("<", "%3C")
+     return "<html><head><script>window.location = '%s' + location.hash;</script></head></html>" % url
+ 

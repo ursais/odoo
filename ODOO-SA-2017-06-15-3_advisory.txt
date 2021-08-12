@@ -1,0 +1,90 @@
+Odoo Security Advisory                   ODOO-SA-2017-06-15-3
+
+Title: Incorrect access control on OAuth tokens
+
+Affects: All Odoo versions
+Component: OAuth2 Authentication module
+Credits: Wolfang Taferner
+CVE-ID: To be announced
+
+I.   Background
+
+Odoo comes with several authentication methods, some of them using
+locally stored passwords, and others relying on external authentication.
+
+One of the external authentication methods is OAuth, provided by the
+OAuth module. This authentication method is not enabled by default,
+and requires an external OAuth2 Authentication Provider, such as
+Facebook, Google or Odoo.com's OAuth.
+
+With OAuth, the user is redirected to the external provider during
+the authentication process, and the user password is never transmitted
+via Odoo. Instead, the user obtains a temporary oauth token from the
+provider, which is then verified by Odoo, and used as a temporary
+password.
+
+
+II.  Problem Description
+
+The OAuth token were not correctly protected once stored in the Odoo
+database.
+
+
+III. Impact
+
+Attack Vector: Network exploitable
+Attack Complexity: Low
+Authentication: Required (regular non-portal user account required)
+CVSS3 Score: High :: 7.1
+CVSS3 Vector: CVSS:3.0/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:L/A:N
+
+A malicious user may use the insufficiently protected tokens to
+hijack the session of another user and perform actions on their behalf.
+Depending on the access level of the hijacked session, this may lead to
+a severe breach of confidentiality.
+
+Odoo databases that do not have the OAuth2 Authentication module
+installed are not at risk.
+
+Odoo S.A. is not aware of any malicious use of this vulnerability.
+
+
+IV.  Workaround
+
+System administrators may uninstall the OAuth module to entirely disable
+OAuth external authentication method, with the obvious consequence of
+entirely blocking this authentication method.
+
+Odoo Online servers have been patched as soon as the correction was
+available.
+
+
+V.   Solution
+
+Apply the patches corresponding to your Odoo installation, or upgrade
+to the latest revision, either via GitHub or by downloading the
+latest version from https://www.odoo.com/page/download
+or http://nightly.odoo.com
+
+To apply the patch, change into the main directory of your Odoo
+installation (the one containing "openerp" or "odoo" and "addons"
+directories), then execute the patch command, typically:
+
+       patch -p0 -f < /path/to/the_patch_file.patch
+       
+This command assumes your installation layout corresponds to
+the latest source code layout of the Odoo project on GitHub.
+If your installation differs, please extract the various patch
+hunks from the files and apply them in the appropriate locations.
+
+
+VI.  Correction details
+
+The following list contains the revisions after which the vulnerability
+is corrected:
+
+- 8.0:  090d7a51beb51b7b27a9e7e4f2f7846fca2d3c89
+- 9.0:  0527564463fa9144bca906fcacf7bb4b4e68ba0a
+- 10.0: 16714a7e71da91382bb111fad32282a65205dffd
+- 10.0-ent and 9.0-ent (Enterprise): see 9.0 and 10.0.
+

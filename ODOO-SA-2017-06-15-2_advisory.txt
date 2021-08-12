@@ -1,0 +1,86 @@
+Odoo Security Advisory                   ODOO-SA-2017-06-15-2
+
+Title: Cross-Site Scripting (XSS) using insecure redirect handler
+
+Affects: Odoo 8.0, 9.0, 10.0 (Community and Enterprise Editions)
+Component: Core
+Credits: Romain E Silva and Adel Nettar, Sysdream
+References: CVE-2017-5871
+
+I.   Background
+
+Odoo includes a generic mechanism for redirecting the end-user
+to a given target URL after performing an operation.
+
+This is typically used to continue the navigation to the original
+destination after letting the user sign in, or after performing some
+housekeeping on the user's session.
+
+In order to allow advanced authentication flows such as OAuth, this
+mechanism supports and allows arbitrary destination URLs to be
+requested.
+
+
+II.  Problem Description
+
+The redirection handler did not verify the URL scheme used in the
+requested redirection URL.
+
+
+III. Impact
+
+Attack Vector: Network exploitable
+Attack Complexity: Low
+Authentication: Not required
+CVSS3 Score: Medium :: 5.4
+CVSS3 Vector: CVSS:3.0/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:L/A:N
+
+An attacker could craft a link that passes a malicious URL to the
+redirect handler, using a non-HTTP(S) scheme, and causing
+the evaluation of arbitrary Javascript code in the user's session.
+
+Using social engineering techniques, the attacker could then trick
+a user into clicking on the link. This might allow the attacker to steal
+session cookies, hijack the user's session, or make the user perform
+actions unknowingly.
+
+Odoo S.A. is not aware of any malicious use of this vulnerability.
+
+
+IV.  Workaround
+
+No workaround is available, applying the patch is strongly recommended.
+
+Odoo Online servers have been patched as soon as the correction was
+available.
+
+
+V.   Solution
+
+Apply the patches corresponding to your Odoo installation, or upgrade
+to the latest revision, either via GitHub or by downloading the
+latest version from https://www.odoo.com/page/download
+or http://nightly.odoo.com
+
+To apply the patch, change into the main directory of your Odoo
+installation (the one containing "openerp" or "odoo" and "addons"
+directories), then execute the patch command, typically:
+
+       patch -p0 -f < /path/to/the_patch_file.patch
+       
+This command assumes your installation layout corresponds to
+the latest source code layout of the Odoo project on GitHub.
+If your installation differs, please extract the various patch
+hunks from the files and apply them in the appropriate locations.
+
+
+VI.  Correction details
+
+The following list contains the revisions after which the vulnerability
+is corrected:
+
+- 8.0:  d655824028dd144e449a9ab835f827f6fdfd3260
+- 9.0:  692f47da6ecb0511fdb914a7b1eefff10ebe1edf
+- 10.0: eaa3682bb609dc69a5499f2c223da479d0d9697b
+- 10.0-ent and 9.0-ent (Enterprise): see 9.0 and 10.0.
+

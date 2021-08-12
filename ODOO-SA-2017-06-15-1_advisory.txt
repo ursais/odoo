@@ -1,0 +1,123 @@
+Odoo Security Advisory                   ODOO-SA-2017-06-15-1
+
+Title: Access control bypass via Psycopg2 vulnerability
+
+Affects: All Odoo versions
+Component: Core
+Credits: Nils Hamerlinck
+CVE ID: To be announced
+
+I.   Background
+
+Odoo uses the psycopg2 Python library as database adapter, in order to
+connect to the PostgreSQL backend, the database management system.
+
+
+II.  Problem Description
+
+Psycopg2 versions before 2.6.3 did not properly handle database query
+parameters that contain NUL (0x00) bytes, passing them unmodified to
+the underlying libpq database driver.
+
+References: 
+  https://github.com/psycopg/psycopg2/issues/420
+  http://initd.org/psycopg/docs/news.html#what-s-new-in-psycopg-2-6-3
+
+
+III. Impact
+
+Attack Vector: Network exploitable
+Authentication: None required
+CVSS3 Score: High :: 9.1
+CVSS3 Vector: CVSS:3.0/AV:N/AC:L/PR:L/UI:R/S:U/C:H/I:L/A:N/E:P/RL:O/RC:C
+
+A creative attacker could craft specific requests using NUL bytes in
+order to trick the system into passing shorter parameters than expected
+to the database layer.
+
+Due to technical constraints of the Odoo authentication layer, this
+technique could be used by an unauthenticated attacker to bypass the
+password verification system entirely, and hijack the session of any
+user!
+
+Because this vulnerability is critical, we urge you to consider
+upgrading as soon as possible (see the Solution section).
+
+Odoo S.A. is not aware of any use of this vulnerability in the wild.
+
+
+IV.  Workaround
+
+No workaround is available.
+
+Odoo Online servers have been patched as soon as the correction was
+available.
+
+
+V.   Solution
+
+Depending on your deployment constraints, you may choose to apply either
+one of the following solutions, or both, at your descrition:
+
+- Solution 1: Upgrading or patching Odoo. (recommended solution for
+              all cases, and especially on Windows environments)
+
+- Solution 2: Upgrading psycopg2 (if you are comfortable with managing
+              Python library versions and verifying version numbers)
+   
+
+ # Solution 1: Upgrading or patching Odoo
+
+ Upgrading your Odoo installationg is the recommended solution.
+
+ If you installed Odoo with a package/all-in-one installer, all you need
+ to do is to download the latest package from our Downloads page, and
+ proceed with installing it on top of your current installation:
+     https://www.odoo.com/page/download
+
+ For Odoo Enterprise, installers are downloadable if you are logged in
+ with a customer account with an Odoo Enterprise subscription, or if you
+ use the download link your received with your purchase.
+    
+ If you installed Odoo without a package, you may want to apply the patch
+ directly. To do this, change into the main directory of your Odoo
+ installation (the one containing "openerp" or "odoo" and "addons"
+ directories), then execute the patch command, typically:
+
+     patch -p0 -f < /path/to/the_patch_file.patch
+       
+ This command assumes your installation layout corresponds to
+ the latest source code layout of the Odoo project on GitHub.
+ If your installation differs, please extract the various patch
+ hunks from the files and apply them in the appropriate locations.
+
+ For those updating via github, the corrected revisions are provided in
+ section VI below.
+
+ # Solution 2: Upgrading Psycopg2
+
+ Upgrading pyscopg2 (to version 2.6.3 or later) is a perfectly valid
+ solution for this vulnerability, if you are familiar with managing
+ Python library versions in your deployment environment.
+
+ This may not be a trivial task however, especially as many Linux
+ distributions do not provide pyscopg2 2.6.3 or later at this time.
+
+ Verifying that your Odoo environment is indeed using the upgraded
+ psycopg2 may not be trivial either, after the upgrade.
+
+ If you want to do it, we recommended following the instructions from
+ psycopg2's website, using "pip":
+     http://initd.org/psycopg/download/
+
+
+VI.  Correction details (in Odoo)
+
+The following list contains the revisions after which the vulnerability
+is corrected:
+
+- 8.0:  eb8d9190154a72d557674fcffb2a397bce5daed9
+- 9.0:  e3a52a9966d4d99cebf7dc95437ecadf87897f69
+- 10.0: 4acfe3577b910e090bc67ad80982208cd660f8e5
+- 10.0-ent and 9.0-ent (Enterprise): see 9.0 and 10.0.
+

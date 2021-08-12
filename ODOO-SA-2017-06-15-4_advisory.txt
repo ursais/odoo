@@ -1,0 +1,96 @@
+Odoo Security Advisory                   ODOO-SA-2017-06-15-4
+
+Title: Remote code execution via Anonymization module
+
+Affects: All Odoo versions
+Component: Database Anonymization module
+Credits: An independent security researcher "Ayrx" has reported this
+         vulnerability to Beyond Security’s SecuriTeam Secure Disclosure
+         program.
+CVE-ID: To be announced
+
+
+I.   Background
+
+Odoo includes an optional "Database Anonymization" module that can be
+used by administrators to perform a one-shot reversible anonymization
+of their database contents. This is typically used to remove all
+identifiable names and details from the address book and all documents
+in an Odoo database, prior to sending it to Odoo's upgrade systems.
+The operation can be reversed later once the database upgrade is
+completed.
+
+
+II.  Problem Description
+
+The serialization system used to store the local data to reverse the
+anonymization procedure relies on the "pickle" object serialization
+algorithm.
+The pickle module of Python is not secure against erroneous or
+maliciously constructed data, and in its default configuration, could be
+exploited to execute arbitrary Python code.
+
+
+III. Impact
+
+Attack Vector: Network exploitable
+Attack Complexity: Low
+Authentication: Privileged user account required
+CVSS3 Score: High :: 8.7
+CVSS3 Vector: CVSS:3.0/AV:N/AC:L/PR:H/UI:N/S:C/C:H/I:H/A:N/E:P/RL:O/RC:C
+
+Malicious users with access to an administrator account on an Odoo
+database could craft a malicious anonymization data file, and use it to
+execute arbitrary Python code.
+
+This would allow them to execute commands with the system privileges of
+the Odoo service, possibly accessing local files, local services, etc.
+
+Systems who host Odoo databases for untrusted users are particularly at
+risk, (e.g. SaaS platforms), as they typically allow users to become
+administrators of their own Odoo database. This is sufficient to exploit
+the vulnerability.
+
+Odoo S.A. is not aware of any malicious use if this vulnerability.
+
+
+IV.  Workaround
+
+Administrators of Odoo deployments where untrusted users are allowed to
+manage their own Odoo databases (SaaS-like) can make the Database
+Anonymization module unavailable by deleting its folder ("anonymization")
+from the "addons_path" directory, and restarting the Odoo relevant service.
+
+Odoo Online servers have been patched as soon as the correction was
+available.
+
+
+V.   Solution
+
+Apply the patches corresponding to your Odoo installation, or upgrade
+to the latest revision, either via GitHub or by downloading the
+latest version from https://www.odoo.com/page/download
+or http://nightly.odoo.com
+
+To apply the patch, change into the main directory of your Odoo
+installation (the one containing "openerp" and "addons" directories),
+then execute the patch command, typically:
+
+       patch -p0 -f < /path/to/the_patch_file.patch
+       
+This command assumes your installation layout corresponds to
+the latest source code layout of the Odoo project on GitHub.
+If your installation differs, please extract the various patch
+hunks from the files and apply them in the appropriate locations.
+
+
+VI.  Correction details
+
+The following list contains the revisions after which the vulnerability
+is corrected:
+
+- 8.0:  89eca9647636b1d801cf52aa98d83131b99d48fd
+- 9.0:  e40a4baf41b3b833af37d0086a3251ae52d4ad1b
+- 10.0: 625c0d5d8eb2c196ffcb04304a3ec7cfc48027ac
+- 10.0-ent and 9.0-ent (Enterprise): see 9.0 and 10.0.
+
