@@ -170,7 +170,7 @@ class StockMove(models.Model):
                 '|',
                     ('location_id.company_id', '=', False),
                     '&',
-                        ('location_id.usage', 'in', ['inventory', 'production']),
+                        ('location_id.usage', 'in', ['supplier','customer','inventory', 'production']),
                         ('location_id.company_id', '=', company_id or self.env.user.company_id.id),
                 ('location_dest_id.company_id', '=', company_id or self.env.user.company_id.id),
         ]
