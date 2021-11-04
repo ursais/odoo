@@ -8,7 +8,6 @@
 # Aleksandr Jadov <a.jadov@tata.lt>, 2021
 # Arminas Grigonis <arminas@versada.lt>, 2021
 # vaalds <vaalds@gmail.com>, 2021
-# grupoda2 <dmitrijus.ivanovas@gmail.com>, 2021
 # Rolandas <panauto1@gmail.com>, 2021
 # Antanas Muliuolis <an.muliuolis@gmail.com>, 2021
 # Anatolij, 2021
@@ -22,10 +21,14 @@
 # UAB "Draugiški sprendimai" <transifex@draugiskisprendimai.lt>, 2021
 # Silvija Butko <silvija.butko@gmail.com>, 2021
 # Audrius Palenskis <audrius.palenskis@gmail.com>, 2021
-# Paulius Sladkevičius <paulius@versada.eu>, 2021
 # Eimantas <eimantas@focusate.eu>, 2021
 # Linas Versada <linaskrisiukenas@gmail.com>, 2021
 # Arunas Vaitekunas <vaitekunas@gmail.com>, 2021
+# Paulius Sladkevičius <paulius@versada.eu>, 2021
+# Jonas Zinkevicius <jozi@odoo.com>, 2021
+# Arunas V. <arunas@devoro.com>, 2021
+# grupoda2 <dmitrijus.ivanovas@gmail.com>, 2021
+# Gailius Kazlauskas, 2021
 # 
 msgid ""
 msgstr ""
@@ -33,7 +36,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2021-02-25 10:15+0000\n"
 "PO-Revision-Date: 2020-09-07 08:09+0000\n"
-"Last-Translator: Arunas Vaitekunas <vaitekunas@gmail.com>, 2021\n"
+"Last-Translator: Gailius Kazlauskas, 2021\n"
 "Language-Team: Lithuanian (https://www.transifex.com/odoo/teams/41243/lt/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -602,7 +605,7 @@ msgstr "<span> Nuo </span>"
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.account_journal_dashboard_kanban_view
 msgid "<span> Manually</span>"
-msgstr ""
+msgstr "<span> Rankiniu būdu</span>"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_account_position_form
@@ -1532,7 +1535,7 @@ msgstr ""
 #: model:ir.model.fields,field_description:account.field_account_move__activity_type_icon
 #: model:ir.model.fields,field_description:account.field_account_payment__activity_type_icon
 msgid "Activity Type Icon"
-msgstr ""
+msgstr "Veiklos tipo ikona"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_journal__sale_activity_user_id
@@ -1840,7 +1843,7 @@ msgstr ""
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_journal__type_control_ids
 msgid "Allowed account types"
-msgstr ""
+msgstr "Leistinos sąskaitos"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_journal__account_control_ids
@@ -2695,7 +2698,7 @@ msgstr "Sąskaitos skaitmeninimas"
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.view_move_form
 msgid "Bill Reference"
-msgstr "Mokėjimo numeris"
+msgstr "Sąskaitos numeris"
 
 #. module: account
 #: model:res.groups,name:account.group_account_invoice
@@ -3599,7 +3602,7 @@ msgstr ""
 #: code:addons/account/models/company.py:0
 #, python-format
 msgid "Corrupted data on journal entry with id %s."
-msgstr ""
+msgstr "Sugadinti duomenys įrašant žurnalą su ID %s."
 
 #. module: account
 #: model:account.account.type,name:account.data_account_type_direct_costs
@@ -5147,7 +5150,7 @@ msgstr ""
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_journal_group__excluded_journal_ids
 msgid "Excluded Journals"
-msgstr ""
+msgstr "Neįtraukti žurnalai"
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_res_company__expects_chart_of_accounts
@@ -5888,7 +5891,7 @@ msgstr "Piktograma"
 #: model:ir.model.fields,help:account.field_account_move__activity_exception_icon
 #: model:ir.model.fields,help:account.field_account_payment__activity_exception_icon
 msgid "Icon to indicate an exception activity."
-msgstr ""
+msgstr "Išimties veiklą žyminti piktograma."
 
 #. module: account
 #: model:ir.model.fields,help:account.field_account_bank_statement__message_needaction
@@ -6035,6 +6038,8 @@ msgid ""
 "If you want to use \"Off-Balance Sheet\" accounts, all the accounts of the "
 "journal entry must be of this type"
 msgstr ""
+"Jei norite naudoti nebalansines sąskaitas, visos žurnalo įrašo sąskaitos "
+"turi būti tokio tipo"
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.res_config_settings_view_form
@@ -6262,7 +6267,7 @@ msgstr ""
 #. module: account
 #: model:ir.model.fields,help:account.field_account_move_line__tax_line_id
 msgid "Indicates that this journal item is a tax line"
-msgstr ""
+msgstr "Nurodo, kad šis žurnalo įrašas yra mokesčių eilutė"
 
 #. module: account
 #. openerp-web
@@ -6609,6 +6614,7 @@ msgstr "S/F patvirtinimui"
 #: model:ir.model.fields,help:account.field_account_payment__reconciled_invoice_ids
 msgid "Invoices whose journal items have been reconciled with these payments."
 msgstr ""
+"Sąskaitos faktūros, kurių žurnalo įrašai buvo sudengti su šiais mokėjimais."
 
 #. module: account
 #: model:ir.actions.report,name:account.account_invoices_without_payment
@@ -6722,6 +6728,12 @@ msgstr ""
 msgid ""
 "It seems that the taxes have been modified since the creation of the journal"
 " entry. You should create the credit note manually instead."
+msgstr ""
+
+#. module: account
+#: code:addons/account/models/account_move.py:0
+#, python-format
+msgid "It was previously '%(previous)s' and it is now '%(now)s'."
 msgstr ""
 
 #. module: account
@@ -7416,7 +7428,7 @@ msgstr "Registruoti vidinę pastabą"
 #: code:addons/account/static/src/js/tours/account.js:0
 #, python-format
 msgid "Looks good. Let's continue."
-msgstr ""
+msgstr "Viskas atrodo gerai. Tęskime."
 
 #. module: account
 #: model_terms:ir.ui.view,arch_db:account.onboarding_invoice_layout_step
@@ -7958,7 +7970,7 @@ msgstr "Naudojamas kodo skaitmenų skaičius"
 #. module: account
 #: model:account.account.type,name:account.data_account_type_non_current_assets
 msgid "Non-current Assets"
-msgstr "Nematerealus ilgalaikis turtas"
+msgstr "Nematerialus ilgalaikis turtas"
 
 #. module: account
 #: model:account.account.type,name:account.data_account_type_non_current_liabilities
@@ -8668,7 +8680,7 @@ msgstr ""
 #: model:ir.model.fields.selection,name:account.selection__account_move__payment_state__partial
 #: model_terms:ir.ui.view,arch_db:account.view_account_invoice_filter
 msgid "Partially Paid"
-msgstr ""
+msgstr "Dalinai apmokėta"
 
 #. module: account
 #: code:addons/account/wizard/account_automatic_entry_wizard.py:0
@@ -8867,7 +8879,7 @@ msgstr "Mokėjimo numeris"
 #: model:ir.model.fields,field_description:account.field_account_move__payment_state
 #: model:ir.model.fields,field_description:account.field_account_payment__payment_state
 msgid "Payment Status"
-msgstr ""
+msgstr "Mokėjimo statusas"
 
 #. module: account
 #: model:ir.actions.act_window,name:account.action_payment_term_form
@@ -10837,7 +10849,7 @@ msgstr "Pradžios data"
 #: code:addons/account/static/src/js/tours/account.js:0
 #, python-format
 msgid "Start by checking your company's data."
-msgstr ""
+msgstr "Pradėkite patikrindami pateiktus Jūsų verslo duomenis."
 
 #. module: account
 #: model:ir.model.fields,field_description:account.field_account_bank_statement__balance_start
@@ -12560,11 +12572,43 @@ msgstr ""
 "Eilės laukelis nurodo numerį, pagal kurį rikiuojamos mokesčių eilutės."
 
 #. module: account
+#: code:addons/account/models/account_move.py:0
+#, python-format
+msgid "The sequence format has changed."
+msgstr ""
+
+#. module: account
 #: code:addons/account/models/sequence_mixin.py:0
 #, python-format
 msgid ""
 "The sequence regex should at least contain the seq grouping keys. For instance:\n"
 "^(?P<prefix1>.*?)(?P<seq>\\d*)(?P<suffix>\\D*?)$"
+msgstr ""
+
+#. module: account
+#: code:addons/account/models/account_move.py:0
+#, python-format
+msgid ""
+"The sequence will never restart.\n"
+"The incrementing number in this case is '%(formatted_seq)s'."
+msgstr ""
+
+#. module: account
+#: code:addons/account/models/account_move.py:0
+#, python-format
+msgid ""
+"The sequence will restart at 1 at the start of every month.\n"
+"The year detected here is '%(year)s' and the month is '%(month)s'.\n"
+"The incrementing number in this case is '%(formatted_seq)s'."
+msgstr ""
+
+#. module: account
+#: code:addons/account/models/account_move.py:0
+#, python-format
+msgid ""
+"The sequence will restart at 1 at the start of every year.\n"
+"The year detected here is '%(year)s'.\n"
+"The incrementing number in this case is '%(formatted_seq)s'."
 msgstr ""
 
 #. module: account
@@ -13203,7 +13247,7 @@ msgstr ""
 #: model:ir.model.fields,help:account.field_account_move__activity_exception_decoration
 #: model:ir.model.fields,help:account.field_account_payment__activity_exception_decoration
 msgid "Type of the exception activity on record."
-msgstr ""
+msgstr "Įrašytos išimties veiklos tipas."
 
 #. module: account
 #: model:ir.model.fields.selection,name:account.selection__account_cash_rounding__rounding_method__up
@@ -13800,6 +13844,18 @@ msgstr ""
 msgid ""
 "You can choose different models for each type of reference. The default one "
 "is the Odoo reference."
+msgstr ""
+
+#. module: account
+#: code:addons/account/models/account_journal.py:0
+#, python-format
+msgid ""
+"You can not archive a journal containing draft journal entries.\n"
+"\n"
+"To proceed:\n"
+"1/ click on the top-right button 'Journal Entries' from this journal form\n"
+"2/ then filter on 'Draft' entries\n"
+"3/ select them all and post or delete them through the action menu"
 msgstr ""
 
 #. module: account
