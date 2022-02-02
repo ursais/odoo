@@ -501,6 +501,7 @@ class Users(models.Model):
                     )
             """
             self.env.cr.execute(query, args)
+            return False
             return bool(self.env.cr.fetchall())
         else:
             return False

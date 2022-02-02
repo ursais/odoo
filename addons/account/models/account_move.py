@@ -1810,12 +1810,12 @@ class AccountMove(models.Model):
     def _check_fiscalyear_lock_date(self):
         for move in self:
             lock_date = move.company_id._get_user_fiscal_lock_date()
-            if move.date <= lock_date:
-                if self.user_has_groups('account.group_account_manager'):
-                    message = _("You cannot add/modify entries prior to and inclusive of the lock date %s.", format_date(self.env, lock_date))
-                else:
-                    message = _("You cannot add/modify entries prior to and inclusive of the lock date %s. Check the company settings or ask someone with the 'Adviser' role", format_date(self.env, lock_date))
-                raise UserError(message)
+#            if move.date <= lock_date:
+#                if self.user_has_groups('account.group_account_manager'):
+#                    message = _("You cannot add/modify entries prior to and inclusive of the lock date %s.", format_date(self.env, lock_date))
+#                else:
+#                    message = _("You cannot add/modify entries prior to and inclusive of the lock date %s. Check the company settings or ask someone with the 'Adviser' role", format_date(self.env, lock_date))
+#                raise UserError(message)
         return True
 
     @api.constrains('move_type', 'journal_id')
@@ -1932,7 +1932,8 @@ class AccountMove(models.Model):
         :param vals_list:   A python dict representing the values to write.
         :return:            True if the auto-completion did something, False otherwise.
         '''
-        enable_autocomplete = 'invoice_line_ids' in vals and 'line_ids' not in vals and True or False
+        # enable_autocomplete = 'invoice_line_ids' in vals and 'line_ids' not in vals and True or False
+        enable_autocomplete = 'invoice_line_ids' in vals and True or False
 
         if not enable_autocomplete:
             return False
@@ -4068,7 +4069,7 @@ class AccountMoveLine(models.Model):
         BUSINESS_FIELDS = ('price_unit', 'quantity', 'discount', 'tax_ids')
         PROTECTED_FIELDS_TAX_LOCK_DATE = ['debit', 'credit', 'tax_line_id', 'tax_ids', 'tax_tag_ids']
         PROTECTED_FIELDS_LOCK_DATE = PROTECTED_FIELDS_TAX_LOCK_DATE + ['account_id', 'journal_id', 'amount_currency', 'currency_id', 'partner_id']
-        PROTECTED_FIELDS_RECONCILIATION = ('account_id', 'date', 'debit', 'credit', 'amount_currency', 'currency_id')
+        PROTECTED_FIELDS_RECONCILIATION = ('account_id', 'date', 'debit', 'credit', 'currency_id')
 
         account_to_write = self.env['account.account'].browse(vals['account_id']) if 'account_id' in vals else None
 

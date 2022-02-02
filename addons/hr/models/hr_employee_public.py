@@ -56,10 +56,10 @@ class HrEmployeePublic(models.Model):
     def _get_fields(self):
         return ','.join('emp.%s' % name for name, field in self._fields.items() if field.store and field.type not in ['many2many', 'one2many'])
 
-    def init(self):
-        tools.drop_view_if_exists(self.env.cr, self._table)
-        self.env.cr.execute("""CREATE or REPLACE VIEW %s as (
-            SELECT
-                %s
-            FROM hr_employee emp
-        )""" % (self._table, self._get_fields()))
+#    def init(self):
+#        tools.drop_view_if_exists(self.env.cr, self._table)
+#        self.env.cr.execute("""CREATE or REPLACE VIEW %s as (
+#            SELECT
+#                %s
+#            FROM hr_employee emp
+#        )""" % (self._table, self._get_fields()))
