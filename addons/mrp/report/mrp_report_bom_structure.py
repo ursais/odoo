@@ -100,7 +100,10 @@ class ReportBomStructure(models.AbstractModel):
             bom_quantity = current_line.product_uom_id._compute_quantity(line_qty, bom.product_uom_id)
         # Display bom components for current selected product variant
         if product_id:
-            product = self.env['product.product'].browse(int(product_id))
+            if type(product_id) is str:
+                product = self.env['product.product'].browse(int(product_id))
+            else:
+                product = self.env['product.product'].browse(int(product_id.id))
         else:
             product = bom.product_id or bom.product_tmpl_id.product_variant_id
         if product:
