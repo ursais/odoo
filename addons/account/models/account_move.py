@@ -1932,8 +1932,8 @@ class AccountMove(models.Model):
         :param vals_list:   A python dict representing the values to write.
         :return:            True if the auto-completion did something, False otherwise.
         '''
-        # enable_autocomplete = 'invoice_line_ids' in vals and 'line_ids' not in vals and True or False
-        enable_autocomplete = 'invoice_line_ids' in vals and True or False
+        enable_autocomplete = 'invoice_line_ids' in vals and 'line_ids' not in vals and True or False
+        #enable_autocomplete = 'invoice_line_ids' in vals and True or False
 
         if not enable_autocomplete:
             return False
