@@ -220,7 +220,7 @@ class AuthorizeAPI():
             }
         }
         response = self._authorize_request(values)
-
+        token.payment_ids.browse(sorted(token.payment_ids.ids, reverse=True)[0]).write({'pebbles_message': response})
         if response and response.get('err_code'):
             return {
                 'x_response_code': self.AUTH_ERROR_STATUS,
@@ -274,7 +274,7 @@ class AuthorizeAPI():
             }
         }
         response = self._authorize_request(values)
-
+        token.payment_ids.browse(sorted(token.payment_ids.ids, reverse=True)[0]).write({'pebbles_message': response})
         if response and response.get('err_code'):
             return {
                 'x_response_code': self.AUTH_ERROR_STATUS,
