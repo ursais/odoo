@@ -551,7 +551,8 @@ class AccountInvoice(models.Model):
                 for field in changed_fields:
                     if field not in vals and invoice[field]:
                         vals[field] = invoice._fields[field].convert_to_write(invoice[field], invoice)
-        bank_account = self._get_default_bank_id(vals.get('type'), vals.get('company_id'))
+        #bank_account = self._get_default_bank_id(vals.get('type'), vals.get('company_id'))
+        bank_account = False
         if bank_account and not vals.get('partner_bank_id'):
             vals['partner_bank_id'] = bank_account.id
 
