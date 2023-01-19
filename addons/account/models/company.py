@@ -219,22 +219,6 @@ class ResCompany(models.Model):
                 }
                 raise RedirectWarning(error_msg, action_error, _('Show unposted entries'))
 
-            unreconciled_statement_lines = self.env['account.bank.statement.line'].search([
-                ('company_id', 'in', self.ids),
-                ('is_reconciled', '=', False),
-                ('date', '<=', values['fiscalyear_lock_date']),
-                ('move_id.state', 'in', ('draft', 'posted')),
-            ])
-            if unreconciled_statement_lines:
-                error_msg = _("There are still unreconciled bank statement lines in the period you want to lock."
-                            "You should either reconcile or delete them.")
-                action_error = {
-                    'type': 'ir.actions.client',
-                    'tag': 'bank_statement_reconciliation_view',
-                    'context': {'statement_line_ids': unreconciled_statement_lines.ids, 'company_ids': self.ids},
-                }
-                raise RedirectWarning(error_msg, action_error, _('Show Unreconciled Bank Statement Line'))
-
     def _get_user_fiscal_lock_date(self):
         """Get the fiscal lock date for this company depending on the user"""
         self.ensure_one()
