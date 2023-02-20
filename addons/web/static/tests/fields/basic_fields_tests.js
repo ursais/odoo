@@ -1910,7 +1910,7 @@ QUnit.module('basic_fields', {
     });
 
     QUnit.test('binary fields that are readonly in create mode do not download', function (assert) {
-        assert.expect(2);
+        assert.expect(4);
 
         // save the session function
         var oldGetFile = session.get_file;
