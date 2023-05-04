@@ -337,7 +337,7 @@ class account_register_payments(models.TransientModel):
             partner_id = inv.commercial_partner_id.id
         account_id = inv.account_id.id
         invoice_type = MAP_INVOICE_TYPE_PARTNER_TYPE[inv.type]
-        recipient_account = inv.partner_bank_id
+        recipient_account = False #inv.partner_bank_id
         return (partner_id, account_id, invoice_type, recipient_account)
 
     @api.multi
