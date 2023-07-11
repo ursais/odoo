@@ -317,7 +317,10 @@ class LoyaltyProgram(models.Model):
                 })],
                 'communication_plan_ids': [(5, 0, 0), (0, 0, {
                     'trigger': 'create',
-                    'mail_template_id': (self.env.ref('loyalty.mail_template_gift_card', raise_if_not_found=False) or self.env['mail.template']).id,
+                    'mail_template_id': (
+                        self.env.ref('loyalty.mail_template_loyalty_card', raise_if_not_found=False)
+                        or self.env['mail.template']
+                    ).id,
                 })],
             },
         }
@@ -372,13 +375,14 @@ class LoyaltyProgram(models.Model):
             raise UserError(_('You can not delete a program in an active state'))
 
     def toggle_active(self):
-        super().toggle_active()
+        res = super().toggle_active()
         # Propagate active state to children
-        for program in self:
+        for program in self.with_context(active_test=False):
             program.rule_ids.active = program.active
             program.reward_ids.active = program.active
             program.communication_plan_ids.active = program.active
-            program.reward_ids.discount_line_product_id.active = program.active
+            program.reward_ids.with_context(active_test=True).discount_line_product_id.active = program.active
+        return res
 
     def write(self, vals):
         # There is an issue when we change the program type, since we clear the rewards and create new ones.

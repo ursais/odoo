@@ -1051,7 +1051,7 @@ class MailThread(models.AbstractModel):
                 is_a_reply = False
                 rcpt_tos_valid_localparts = [to for to in rcpt_tos_valid_localparts if to in other_model_aliases.mapped('alias_name')]
 
-        if is_a_reply:
+        if is_a_reply and reply_model:
             reply_model_id = self.env['ir.model']._get_id(reply_model)
             dest_aliases = self.env['mail.alias'].search([
                 ('alias_name', 'in', rcpt_tos_localparts),
@@ -1390,6 +1390,10 @@ class MailThread(models.AbstractModel):
                     continue  # skip container
 
                 filename = part.get_filename()  # I may not properly handle all charsets
+                if part.get_content_type() == 'text/xml' and not part.get_param('charset'):
+                    # for text/xml with omitted charset, the charset is assumed to be ASCII by the `email` module
+                    # although the payload might be in UTF8
+                    part.set_charset('utf-8')
                 encoding = part.get_content_charset()  # None if attachment
 
                 content = part.get_content()
@@ -1861,7 +1865,10 @@ class MailThread(models.AbstractModel):
                     continue
                 if isinstance(content, str):
                     encoding = info and info.get('encoding')
-                    content = content.encode(encoding or 'utf-8')
+                    try:
+                        content = content.encode(encoding or "utf-8")
+                    except UnicodeEncodeError:
+                        content = content.encode("utf-8")
                 elif isinstance(content, EmailMessage):
                     content = content.as_bytes()
                 elif content is None:
@@ -1969,8 +1976,9 @@ class MailThread(models.AbstractModel):
         self = self._fallback_lang() # add lang to context immediately since it will be useful in various flows latter.
 
         # Find the message's author
-        if self.env.user._is_public() and 'guest' in self.env.context:
-            author_guest_id = self.env.context['guest'].id
+        guest = self.env['mail.guest']._get_guest_from_context()
+        if self.env.user._is_public() and guest:
+            author_guest_id = guest.id
             author_id, email_from = False, False
         else:
             author_guest_id = False

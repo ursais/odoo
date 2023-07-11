@@ -78,7 +78,6 @@ class account_journal(models.Model):
               JOIN mail_activity activity ON activity.res_id = move.id AND activity.res_model = 'account.move'
          LEFT JOIN mail_activity_type act_type ON activity.activity_type_id = act_type.id
              WHERE move.journal_id = ANY(%(ids)s)
-               AND (act_type.category != 'tax_report' OR (act_type.category = 'tax_report' AND activity.date_deadline <= %(today)s))
         """
         self.env.cr.execute(sql_query, {'ids': self.ids, 'today': today, 'lang': lang})
         for activity in self.env.cr.dictfetchall():
@@ -106,7 +105,7 @@ class account_journal(models.Model):
               JOIN res_company company ON company.id = move.company_id
              WHERE move.journal_id = ANY(%(journal_ids)s)
                AND move.state = 'posted'
-               AND (company.fiscalyear_lock_date IS NULL OR move.date >= company.fiscalyear_lock_date)
+               AND (company.fiscalyear_lock_date IS NULL OR move.date > company.fiscalyear_lock_date)
           GROUP BY move.journal_id, move.sequence_prefix
             HAVING COUNT(*) != MAX(move.sequence_number) - MIN(move.sequence_number) + 1
         """, {
@@ -185,6 +184,7 @@ class account_journal(models.Model):
                 for i in range(30, 0, -5):
                     current_date = today + timedelta(days=-i)
                     data.append(build_graph_data(current_date, random.randint(-5, 15), currency))
+                    graph_key = _('Sample data')
             else:
                 last_balance = journal.current_statement_balance
                 data.append(build_graph_data(today, last_balance, currency))
@@ -194,7 +194,7 @@ class account_journal(models.Model):
                 #(graph is drawn backward)
                 for val in journal_result:
                     date = val['date']
-                    if date != today.strftime(DF):  # make sure the last point in the graph is today
+                    if date.strftime(DF) != today.strftime(DF):  # make sure the last point in the graph is today
                         data[:0] = [build_graph_data(date, amount, currency)]
                     amount -= val['amount']
 
@@ -352,7 +352,7 @@ class account_journal(models.Model):
                       SELECT id
                         FROM account_bank_statement
                        WHERE journal_id = journal.id
-                    ORDER BY date DESC
+                    ORDER BY first_line_index DESC
                        LIMIT 1
                    ) statement ON TRUE
              WHERE journal.id = ANY(%s)
@@ -404,7 +404,7 @@ class account_journal(models.Model):
         field_list = [
             "account_move.journal_id",
             "(CASE WHEN account_move.move_type IN ('out_refund', 'in_refund') THEN -1 ELSE 1 END) * account_move.amount_residual AS amount_total",
-            "account_move.amount_residual_signed AS amount_total_company",
+            "(CASE WHEN account_move.move_type IN ('in_invoice', 'in_refund', 'in_receipt') THEN -1 ELSE 1 END) * account_move.amount_residual_signed AS amount_total_company",
             "account_move.currency_id AS currency",
             "account_move.move_type",
             "account_move.invoice_date",

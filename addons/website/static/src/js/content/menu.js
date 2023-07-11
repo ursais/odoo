@@ -5,6 +5,8 @@ const config = require('web.config');
 var publicWidget = require('web.public.widget');
 var animations = require('website.content.snippets.animation');
 const extraMenuUpdateCallbacks = [];
+const weUtils = require('web_editor.utils');
+const dom = require('web.dom');
 
 const BaseAnimatedHeader = animations.Animation.extend({
     disabledInEditableMode: false,
@@ -78,17 +80,7 @@ const BaseAnimatedHeader = animations.Animation.extend({
      * @private
      */
     _adaptFixedHeaderPosition() {
-        // Compensate scrollbar
-        this.el.style.removeProperty('right');
-        if (this.fixedHeader) {
-            const scrollableEl = $(this.el).parent().closestScrollable()[0];
-            const style = window.getComputedStyle(this.el);
-            const borderLeftWidth = parseInt(style.borderLeftWidth.replace('px', ''));
-            const borderRightWidth = parseInt(style.borderRightWidth.replace('px', ''));
-            const bordersWidth = borderLeftWidth + borderRightWidth;
-            const newValue = parseInt(style['right']) + scrollableEl.offsetWidth - scrollableEl.clientWidth - bordersWidth;
-            this.el.style.setProperty('right', `${newValue}px`, 'important');
-        }
+        dom.compensateScrollbar(this.el, this.fixedHeader, false, 'right');
     },
     /**
      * @private
@@ -539,7 +531,7 @@ publicWidget.registry.menuDirection = publicWidget.Widget.extend({
      * @private
      */
     _onDropdownShow: function (ev) {
-        const $dropdown = $(ev.target).closest('.dropdown');
+        const $dropdown = $(ev.target).closest('.dropdown, .dropup');
         var $menu = $dropdown.children('.dropdown-menu');
         var liOffset = $dropdown.offset().left;
         var liWidth = $dropdown.outerWidth();
@@ -630,6 +622,24 @@ publicWidget.registry.hoverableDropdown = animations.Animation.extend({
             Dropdown.getOrCreateInstance(toggleEl).hide();
         }
     },
+    /**
+     * @private
+     * @param {Event} ev
+     * @param {String} method bootstrap dropdowns method name
+     */
+    _updateDropdownVisibility: function (ev, method) {
+        const { currentTarget } = ev;
+        if (config.device.size_class <= config.device.SIZES.SM) {
+            return;
+        }
+        if (currentTarget.classList.contains('o_extra_menu_items')) {
+            return;
+        }
+        const dropdownToggle = currentTarget.querySelector('.dropdown-toggle');
+        if (dropdownToggle) {
+            Dropdown.getOrCreateInstance(dropdownToggle)[method]();
+        }
+    },
 
     //--------------------------------------------------------------------------
     // Handlers
@@ -648,11 +658,7 @@ publicWidget.registry.hoverableDropdown = animations.Animation.extend({
         }
         // The user must click on the dropdown if he is on mobile (no way to
         // hover) or if the dropdown is the extra menu ('+').
-        if (config.device.size_class <= config.device.SIZES.SM ||
-            ev.currentTarget.classList.contains('o_extra_menu_items')) {
-            return;
-        }
-        Dropdown.getOrCreateInstance(ev.currentTarget.querySelector('.dropdown-toggle')).show();
+        this._updateDropdownVisibility(ev, 'show');
     },
     /**
      * @private
@@ -663,11 +669,7 @@ publicWidget.registry.hoverableDropdown = animations.Animation.extend({
             // Cancel handling from view mode.
             return;
         }
-        if (config.device.size_class <= config.device.SIZES.SM ||
-            ev.currentTarget.classList.contains('o_extra_menu_items')) {
-            return;
-        }
-        Dropdown.getOrCreateInstance(ev.currentTarget.querySelector('.dropdown-toggle')).hide();
+        this._updateDropdownVisibility(ev, 'hide');
     },
     /**
      * Called when the page is clicked anywhere.
@@ -723,6 +725,13 @@ publicWidget.registry.HeaderMainCollapse = publicWidget.Widget.extend({
                     this.options.wysiwyg && this.options.wysiwyg.odooEditor.observerActive();
                 }
             }
+            // Specific case with the "boxed" header template where the "call to
+            // action" button is inaccessible in the "off-canvas" mobile menu.
+            this.offcanvasAndBoxedHeader = false;
+            if (weUtils.getCSSVariableValue('header-template').includes('boxed')) {
+                this.boxedHeaderCallToActionEl = this.$target[0].querySelector('#top_menu_collapse .oe_structure_solo');
+                this.offcanvasAndBoxedHeader = !!this.boxedHeaderCallToActionEl;
+            }
         }
         return this._super(...arguments);
     },
@@ -742,6 +751,10 @@ publicWidget.registry.HeaderMainCollapse = publicWidget.Widget.extend({
             this.navbarEl.append(this.languageSelectorEl);
             this.options.wysiwyg && this.options.wysiwyg.odooEditor.observerActive();
         }
+        if (this.offcanvasAndBoxedHeader) {
+            this.boxedHeaderCallToActionEl.classList.add('nav-item');
+            this.navbarEl.append(this.boxedHeaderCallToActionEl);
+        }
     },
     /**
      * @private
@@ -753,6 +766,10 @@ publicWidget.registry.HeaderMainCollapse = publicWidget.Widget.extend({
             this.languageSelectorEl.classList.remove('nav-item');
             this.navbarEl.after(this.languageSelectorEl);
             this.options.wysiwyg && this.options.wysiwyg.odooEditor.observerActive();
+        }
+        if (this.offcanvasAndBoxedHeader) {
+            this.boxedHeaderCallToActionEl.classList.remove('nav-item');
+            this.navbarEl.after(this.boxedHeaderCallToActionEl);
         }
     },
 });
