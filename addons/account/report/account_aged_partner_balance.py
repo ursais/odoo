@@ -145,12 +145,12 @@ class ReportAgedPartnerBalance(models.AbstractModel):
                     if partial_line.max_date <= date_from:
                         line_amount -= partial_line.company_id.currency_id._convert(partial_line.amount, user_currency, user_company, date_from)
 
-                if not self.env.user.company_id.currency_id.is_zero(line_amount):
+                if partner_id and not self.env.user.company_id.currency_id.is_zero(line_amount):
                     partners_amount[partner_id] += line_amount
                     lines.setdefault(partner_id, [])
                     lines[partner_id].append({
                         'line': line,
-                        'amount': line_amount,
+                        'amount': line_amount and line_amount or 0,
                         'period': i + 1,
                         })
             history.append(partners_amount)
