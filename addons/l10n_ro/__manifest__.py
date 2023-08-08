@@ -25,6 +25,8 @@ Romanian accounting chart and localization.
     """,
     "data": ['views/res_partner_view.xml',
              'data/l10n_ro_chart_data.xml',
+             'data/account.account.template.csv',
+             'data/l10n_ro_chart_post_data.xml',
              'data/account_data.xml',
              'data/account_tax_data.xml',
              'data/account_fiscal_position_data.xml',
@@ -32,4 +34,5 @@ Romanian accounting chart and localization.
              'data/res.country.state.csv',
              'data/res.bank.csv',
              ],
+    'license': 'LGPL-3',
 }

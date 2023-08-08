@@ -256,7 +256,10 @@ GROUP BY fol.id%s""" % (
             new, upd = self._add_default_followers(res_model, res_ids, partner_ids, channel_ids, customer_ids=customer_ids)
         else:
             new, upd = self._add_followers(res_model, res_ids, partner_ids, partner_subtypes, channel_ids, channel_subtypes, check_existing=check_existing, existing_policy=existing_policy)
-        sudo_self.create([
+        ctx = dict(self.env.context)
+        if channel_ids and 'default_partner_id' in self.env.context:
+            ctx.pop('default_partner_id', None)
+        sudo_self.with_context(ctx).create([
             dict(values, res_id=res_id)
             for res_id, values_list in new.items()
             for values in values_list
@@ -336,10 +339,14 @@ GROUP BY fol.id%s""" % (
                     fol_id, sids = next(((key, val[3]) for key, val in data_fols.items() if val[0] == res_id and val[1] == partner_id), (False, []))
                     new_sids = set(partner_subtypes[partner_id]) - set(sids)
                     old_sids = set(sids) - set(partner_subtypes[partner_id])
+                    update_cmd = []
                     if fol_id and new_sids:
-                        update[fol_id] = {'subtype_ids': [(4, sid) for sid in new_sids]}
+                        update_cmd += [(4, sid) for sid in new_sids]
                     if fol_id and old_sids and existing_policy == 'replace':
-                        update[fol_id] = {'subtype_ids': [(3, sid) for sid in old_sids]}
+                        update_cmd += [(3, sid) for sid in old_sids]
+                    if update_cmd:
+                        update[fol_id] = {'subtype_ids': update_cmd}
+
             for channel_id in set(channel_ids or []):
                 if channel_id not in doc_cids[res_id]:
                     new.setdefault(res_id, list()).append({
@@ -351,9 +358,12 @@ GROUP BY fol.id%s""" % (
                     fol_id, sids = next(((key, val[3]) for key, val in data_fols.items() if val[0] == res_id and val[2] == channel_id), (False, []))
                     new_sids = set(channel_subtypes[channel_id]) - set(sids)
                     old_sids = set(sids) - set(channel_subtypes[channel_id])
+                    update_cmd = []
                     if fol_id and new_sids:
-                        update[fol_id] = {'subtype_ids': [(4, sid) for sid in new_sids]}
+                        update_cmd += [(4, sid) for sid in new_sids]
                     if fol_id and old_sids and existing_policy == 'replace':
-                        update[fol_id] = {'subtype_ids': [(3, sid) for sid in old_sids]}
+                        update_cmd += [(3, sid) for sid in old_sids]
+                    if update_cmd:
+                        update[fol_id] = {'subtype_ids': update_cmd}
 
         return new, update

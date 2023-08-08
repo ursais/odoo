@@ -160,7 +160,8 @@ class Message(models.Model):
                 (self._table, operator)
         self.env.cr.execute(query, (value,))
         ids = [t[0] for t in self.env.cr.fetchall()]
-        return [('id', 'in', ids)]
+        # return domain with an implicit AND
+        return [('id', 'in', ids), (1, '=', 1)]
 
     @api.one
     @api.depends('size')
@@ -231,6 +232,7 @@ class MultiTag(models.Model):
     _description = 'Test New API Multi Tag'
 
     name = fields.Char()
+    active = fields.Boolean(default=True)
 
 
 class Edition(models.Model):
@@ -505,3 +507,10 @@ class MonetaryInherits(models.Model):
 
     monetary_id = fields.Many2one('test_new_api.monetary_base', required=True, ondelete='cascade')
     currency_id = fields.Many2one('res.currency')
+
+
+class FieldWithCaps(models.Model):
+    _name = 'test_new_api.field_with_caps'
+    _description = 'Model with field defined with capital letters'
+
+    pArTneR_321_id = fields.Many2one('res.partner')

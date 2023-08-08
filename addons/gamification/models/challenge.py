@@ -344,12 +344,12 @@ class Challenge(models.Model):
                 date_clause = ""
                 query_params = [line.id]
                 if start_date:
-                    date_clause += "AND g.start_date = %s"
+                    date_clause += " AND g.start_date = %s"
                     query_params.append(start_date)
                 if end_date:
-                    date_clause += "AND g.end_date = %s"
+                    date_clause += " AND g.end_date = %s"
                     query_params.append(end_date)
-            
+
                 query = """SELECT u.id AS user_id
                              FROM res_users u
                         LEFT JOIN gamification_goal g
@@ -381,11 +381,11 @@ class Challenge(models.Model):
                 if end_date:
                     values['end_date'] = end_date
 
-                    # the goal is initialised over the limit to make sure we will compute it at least once
-                    if line.condition == 'higher':
-                        values['current'] = line.target_goal - 1
-                    else:
-                        values['current'] = line.target_goal + 1
+                # the goal is initialised over the limit to make sure we will compute it at least once
+                if line.condition == 'higher':
+                    values['current'] = line.target_goal - 1
+                else:
+                    values['current'] = line.target_goal + 1
 
                 if challenge.remind_update_delay:
                     values['remind_update_delay'] = challenge.remind_update_delay
@@ -477,7 +477,7 @@ class Challenge(models.Model):
                 ('state', '!=', 'draft'),
             ]
             if restrict_goals:
-                domain.append(('ids', 'in', restrict_goals.ids))
+                domain.append(('id', 'in', restrict_goals.ids))
             else:
                 # if no subset goals, use the dates for restriction
                 if start_date:

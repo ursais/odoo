@@ -623,11 +623,13 @@ registry.parallax = Animation.extend({
 
         // Reset offset if parallax effect will not be performed and leave
         this.$target.toggleClass('s_parallax_is_fixed', this.speed === 1);
-        if (this.speed === 0 || this.speed === 1) {
+        var noParallaxSpeed = (this.speed === 0 || this.speed === 1);
+        this.$target.toggleClass('s_parallax_no_overflow_hidden', noParallaxSpeed);
+        if (noParallaxSpeed) {
             this.$bg.css({
                 transform: '',
                 top: '',
-                bottom: ''
+                bottom: '',
             });
             return;
         }
@@ -930,6 +932,10 @@ registry.gallerySlider = Animation.extend({
     destroy: function () {
         this._super.apply(this, arguments);
 
+        if (!this.$indicator) {
+            return;
+        }
+
         this.$prev.prependTo(this.$indicator);
         this.$next.appendTo(this.$indicator);
         this.$carousel.off('.gallery_slider');
@@ -1033,11 +1039,12 @@ registry.facebookPage = Animation.extend({
         if (!params.href) {
             return def;
         }
-        params.width = utils.confine(this.$el.width(), 180, 500);
+        params.width = utils.confine(Math.floor(this.$el.width()), 180, 500);
 
         var src = $.param.querystring('https://www.facebook.com/plugins/page.php', params);
         this.$iframe = $('<iframe/>', {
             src: src,
+            class: 'o_temp_auto_element',
             width: params.width,
             height: params.height,
             css: {

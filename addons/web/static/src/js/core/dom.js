@@ -506,7 +506,7 @@ var dom = {
 
             var $dropdownMenu = $('<ul/>', {class: 'dropdown-menu'});
             $extraItemsToggle = $('<li/>', {class: 'nav-item dropdown o_extra_menu_items'})
-                .append($('<a/>', {href: '#', class: 'nav-link dropdown-toggle o-no-caret', 'data-toggle': 'dropdown'})
+                .append($('<a/>', {role: 'button', href: '#', class: 'nav-link dropdown-toggle o-no-caret', 'data-toggle': 'dropdown', 'aria-expanded': false})
                     .append($('<i/>', {class: 'fa fa-plus'})))
                 .append($dropdownMenu);
             $extraItemsToggle.insertAfter($items.last());
@@ -514,7 +514,7 @@ var dom = {
             menuItemsWidth += computeFloatOuterWidthWithMargins($extraItemsToggle[0]);
             do {
                 menuItemsWidth -= computeFloatOuterWidthWithMargins($items.eq(--nbItems)[0]);
-            } while (!(maxWidth - menuItemsWidth >= -0.001));
+            } while (!(maxWidth - menuItemsWidth >= -0.001) && (nbItems > 0));
 
             var $extraItems = $items.slice(nbItems).detach();
             $extraItems.removeClass('nav-item');

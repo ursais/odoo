@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
-import unittest
 
-from odoo.tests.common import tagged
-from odoo.tools import html_sanitize, append_content_to_html, plaintext2html, email_split, misc
+from email.mime.multipart import MIMEMultipart
+from unittest.mock import patch
+
+from odoo.tests.common import BaseCase
+from odoo.tests.common import SavepointCase
+from odoo.tools import html_sanitize, append_content_to_html, plaintext2html, email_split, misc, decode_smtp_header
+
 from . import test_mail_examples
 
 
-@tagged('standard', 'at_install')
-class TestSanitizer(unittest.TestCase):
+class TestSanitizer(BaseCase):
     """ Test the html sanitizer that filters html to remove unwanted attributes """
 
     def test_basic_sanitizer(self):
@@ -281,6 +284,11 @@ class TestSanitizer(unittest.TestCase):
         self.assertNotIn('<title>404 - Not Found</title>', html)
         self.assertIn('<h1>404 - Not Found</h1>', html)
 
+    def test_cid_with_at(self):
+        img_tag = '<img src="@">'
+        sanitized = html_sanitize(img_tag, sanitize_tags=False, strip_classes=True)
+        self.assertEqual(img_tag, sanitized, "img with can have cid containing @ and shouldn't be escaped")
+
     # ms office is currently not supported, have to find a way to support it
     # def test_30_email_msoffice(self):
     #     new_html = html_sanitize(test_mail_examples.MSOFFICE_1, remove=True)
@@ -290,8 +298,7 @@ class TestSanitizer(unittest.TestCase):
     #         self.assertNotIn(ext, new_html)
 
 
-@tagged('standard', 'at_install')
-class TestHtmlTools(unittest.TestCase):
+class TestHtmlTools(BaseCase):
     """ Test some of our generic utility functions about html """
 
     def test_plaintext2html(self):
@@ -311,6 +318,8 @@ class TestHtmlTools(unittest.TestCase):
              '<!DOCTYPE...><html encoding="blah">some <b>content</b>\n<pre>--\nYours truly</pre>\n</html>'),
             ('<!DOCTYPE...><HTML encoding="blah">some <b>content</b></HtMl>', '--\nYours truly', True, False, False,
              '<!DOCTYPE...><html encoding="blah">some <b>content</b>\n<p>--<br/>Yours truly</p>\n</html>'),
+            ('<html><body>some <b>content</b></body></html>', '--\nYours & <truly>', True, True, False,
+             '<html><body>some <b>content</b>\n<pre>--\nYours &amp; &lt;truly&gt;</pre>\n</body></html>'),
             ('<html><body>some <b>content</b></body></html>', '<!DOCTYPE...>\n<html><body>\n<p>--</p>\n<p>Yours truly</p>\n</body>\n</html>', False, False, False,
              '<html><body>some <b>content</b>\n\n\n<p>--</p>\n<p>Yours truly</p>\n\n\n</body></html>'),
         ]
@@ -318,8 +327,7 @@ class TestHtmlTools(unittest.TestCase):
             self.assertEqual(append_content_to_html(html, content, plaintext_flag, preserve_flag, container_tag), expected, 'append_content_to_html is broken')
 
 
-@tagged('standard', 'at_install')
-class TestEmailTools(unittest.TestCase):
+class TestEmailTools(BaseCase):
     """ Test some of our generic utility functions for emails """
 
     def test_email_split(self):
@@ -332,3 +340,128 @@ class TestEmailTools(unittest.TestCase):
         ]
         for text, expected in cases:
             self.assertEqual(email_split(text), expected, 'email_split is broken')
+
+
+    def test_decode_smtp_header_email(self):
+        cases = [
+            # In == Out for trivial ASCII cases
+            ('Joe Doe <joe@ex.com>', 'Joe Doe <joe@ex.com>'),
+            ('Joe <joe@ex.com>, Mike <mike@ex.com>', 'Joe <joe@ex.com>, Mike <mike@ex.com>'),
+
+            # Same thing, but RFC822 quoted-strings must be preserved
+            ('"Doe, Joe" <joe@ex.com>', '"Doe, Joe" <joe@ex.com>'),
+            ('"Doe, Joe" <joe@ex.com>, "Foo, Mike" <mike@ex.com>',
+                    '"Doe, Joe" <joe@ex.com>, "Foo, Mike" <mike@ex.com>'),
+
+            # RFC2047-encoded words have to be quoted after decoding, because
+            # they are considered RFC822 `words` i.e. atom or quoted-string only!
+            # It's ok to quote a single word even if unnecessary.
+            # Example values produced by `formataddr((name, address), 'ascii')`
+            ("=?utf-8?b?Sm/DqQ==?= <joe@ex.com>", '"Joé" <joe@ex.com>'),
+            ("=?utf-8?b?Sm/DqQ==?= <joe@ex.com>, =?utf-8?b?RsO2w7YsIE1pa2U=?= <mike@ex.com>",
+                    '"Joé" <joe@ex.com>, "Föö, Mike" <mike@ex.com>'),
+            ('=?utf-8?b?RG/DqSwg?= =?US-ASCII?Q?Joe?= <joe@ex.com>',
+                '"Doé, ""Joe" <joe@ex.com>'),
+
+            # Double-quotes may appear in the encoded form and /must/ be turned
+            # into a RFC2822 quoted-pair (i.e. escaped)
+            #   "Trevor \"Banana\" Dumoulin" <tbd@ex.com>
+            ('=?utf-8?b?VHLDqXZvciAiQmFuYW5hIiBEdW1vdWxpbg==?= <tbd@ex.com>',
+                    '"Trévor \\"Banana\\" Dumoulin" <tbd@ex.com>'),
+        ]
+
+        for test, truth in cases:
+            self.assertEqual(decode_smtp_header(test, quoted=True), truth)
+
+
+
+class EmailConfigCase(SavepointCase):
+    @patch.dict("odoo.tools.config.options", {"email_from": "settings@example.com"})
+    def test_default_email_from(self, *args):
+        """Email from setting is respected."""
+        # ICP setting is more important
+        ICP = self.env["ir.config_parameter"].sudo()
+        ICP.set_param("mail.catchall.domain", "example.org")
+        ICP.set_param("mail.default.from", "icp")
+        message = self.env["ir.mail_server"].build_email(
+            False, "recipient@example.com", "Subject",
+            "The body of an email",
+        )
+        self.assertEqual(message["From"], "icp@example.org")
+        # Without ICP, the config file/CLI setting is used
+        ICP.set_param("mail.default.from", False)
+        message = self.env["ir.mail_server"].build_email(
+            False, "recipient@example.com", "Subject",
+            "The body of an email",
+        )
+        self.assertEqual(message["From"], "settings@example.com")
+
+    def test_email_from_rewrite(self):
+        get_email_from = self.env['ir.mail_server']._get_email_from
+        set_param = self.env['ir.config_parameter'].set_param
+
+        # Standard case, no setting
+        set_param('mail.force.smtp.from', False)
+        set_param('mail.dynamic.smtp.from', False)
+        set_param('mail.catchall.domain', 'odoo.example.com')
+
+        email_from, return_path = get_email_from('admin@test.example.com')
+        self.assertEqual(email_from, 'admin@test.example.com')
+        self.assertFalse(return_path)
+
+        email_from, return_path = get_email_from('"Admin" <admin@test.example.com>')
+        self.assertEqual(email_from, '"Admin" <admin@test.example.com>')
+        self.assertFalse(return_path)
+
+        # We always force the email FROM
+        set_param('mail.force.smtp.from', 'email_force@domain.com')
+        set_param('mail.dynamic.smtp.from', False)
+        set_param('mail.catchall.domain', 'odoo.example.com')
+
+        email_from, return_path = get_email_from('admin@test.example.com')
+        self.assertEqual(email_from, '"admin" <email_force@domain.com>')
+        self.assertEqual(return_path, 'email_force@domain.com')
+
+        email_from, return_path = get_email_from('"Admin" <admin@test.example.com>')
+        self.assertEqual(email_from, '"Admin" <email_force@domain.com>')
+        self.assertEqual(return_path, 'email_force@domain.com')
+
+        # We always force the email FROM (notification email contains a name part)
+        set_param('mail.force.smtp.from', '"Your notification bot" <email_force@domain.com>')
+        set_param('mail.dynamic.smtp.from', False)
+        set_param('mail.catchall.domain', 'odoo.example.com')
+
+        email_from, return_path = get_email_from('"Admin" <admin@test.example.com>')
+        self.assertEqual(email_from, '"Admin" <email_force@domain.com>',
+                         msg='Should drop the name part of the forced email')
+        self.assertEqual(return_path, 'email_force@domain.com')
+
+        # We dynamically force the email FROM
+        set_param('mail.force.smtp.from', False)
+        set_param('mail.dynamic.smtp.from', 'notification@odoo.example.com')
+        set_param('mail.catchall.domain', 'odoo.example.com')
+
+        email_from, return_path = get_email_from('"Admin" <admin@test.example.com>')
+        self.assertEqual(email_from, '"Admin" <notification@odoo.example.com>',
+                         msg='Domain is not the same as the catchall domain, we should force the email FROM')
+        self.assertEqual(return_path, 'notification@odoo.example.com')
+
+        email_from, return_path = get_email_from('"Admin" <admin@odoo.example.com>')
+        self.assertEqual(email_from, '"Admin" <admin@odoo.example.com>',
+                         msg='Domain is the same as the catchall domain, we should not force the email FROM')
+        self.assertFalse(return_path)
+
+        # We dynamically force the email FROM (notification email contains a name part)
+        set_param('mail.force.smtp.from', False)
+        set_param('mail.dynamic.smtp.from', '"Your notification bot" <notification@odoo.example.com>')
+        set_param('mail.catchall.domain', 'odoo.example.com')
+
+        email_from, return_path = get_email_from('"Admin" <admin@test.example.com>')
+        self.assertEqual(email_from, '"Admin" <notification@odoo.example.com>',
+                         msg='Domain is not the same as the catchall domain, we should force the email FROM')
+        self.assertEqual(return_path, 'notification@odoo.example.com')
+
+        email_from, return_path = get_email_from('"Admin" <admin@odoo.example.com>')
+        self.assertEqual(email_from, '"Admin" <admin@odoo.example.com>',
+                         msg='Domain is the same as the catchall domain, we should not force the email FROM')
+        self.assertFalse(return_path)

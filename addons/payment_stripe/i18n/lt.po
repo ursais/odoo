@@ -6,9 +6,8 @@
 # Arminas Grigonis <arminas@versada.lt>, 2018
 # Anatolij, 2018
 # Silvija Butko <silvija.butko@gmail.com>, 2018
-# Šarūnas Ažna <sarunas.azna@gmail.com>, 2018
 # digitouch UAB <digitouchagencyeur@gmail.com>, 2018
-# Linas Versada <linaskrisiukenas@gmail.com>, 2018
+# Linas Versada <linaskrisiukenas@gmail.com>, 2019
 # 
 msgid ""
 msgstr ""
@@ -16,7 +15,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2018-09-21 13:17+0000\n"
 "PO-Revision-Date: 2018-08-24 09:22+0000\n"
-"Last-Translator: Linas Versada <linaskrisiukenas@gmail.com>, 2018\n"
+"Last-Translator: Linas Versada <linaskrisiukenas@gmail.com>, 2019\n"
 "Language-Team: Lithuanian (https://www.transifex.com/odoo/teams/41243/lt/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -70,7 +69,7 @@ msgstr "Kortelės numeris"
 #. module: payment_stripe
 #: model_terms:ir.ui.view,arch_db:payment_stripe.stripe_s2s_form
 msgid "Cardholder name"
-msgstr "Kortelės savininko vardas"
+msgstr "Kortelės turėtojo vardas"
 
 #. module: payment_stripe
 #: model:ir.model.fields,field_description:payment_stripe.field_payment_acquirer__stripe_image_url
@@ -94,7 +93,7 @@ msgstr "Klaida"
 #. module: payment_stripe
 #: model_terms:ir.ui.view,arch_db:payment_stripe.stripe_s2s_form
 msgid "Expires (MM / YY)"
-msgstr "Galiojimas (Mėnuo/ Metai)"
+msgstr "Galioja (Mėnuo/ Metai)"
 
 #. module: payment_stripe
 #. openerp-web
@@ -199,6 +198,12 @@ msgid "Stripe: no order found for reference %s"
 msgstr "Stripe: numeriui %s nerasta užsakymų"
 
 #. module: payment_stripe
+#: code:addons/payment_stripe/models/payment.py:260
+#, python-format
+msgid "Stripe: no payment token was provided or the token creation failed."
+msgstr ""
+
+#. module: payment_stripe
 #: code:addons/payment_stripe/models/payment.py:170
 #, python-format
 msgid "We're sorry to report that the transaction has failed."
@@ -207,4 +212,4 @@ msgstr "Apgailestaujame, tačiau operacija nepavyko."
 #. module: payment_stripe
 #: selection:payment.acquirer,provider:0
 msgid "Wire Transfer"
-msgstr "Pavedimu"
+msgstr "Piniginė perlaida"

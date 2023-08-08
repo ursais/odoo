@@ -127,7 +127,7 @@ var SnippetOption = Widget.extend({
      * @param {jQuery} $opt - the related DOMElement option
      */
     selectClass: function (previewMode, value, $opt) {
-        var $group = $opt && $opt.closest('.dropdown-submenu');
+        var $group = $opt && $opt.parents('.dropdown-submenu').last();
         if (!$group || !$group.length) {
             $group = this.$el;
         }
@@ -289,15 +289,29 @@ var SnippetOption = Widget.extend({
             })
             .addClass('active');
 
-        _processSelectClassElements(this.$el);
-        _.each(this.$el.find('.dropdown-menu'), function (group) {
-            _processSelectClassElements($(group).children());
+        // Get submenus which are not inside submenus
+        var $submenus = this.$el.find('.dropdown-submenu')
+            .addBack('.dropdown-submenu')
+            .not('.dropdown-submenu .dropdown-submenu');
+
+        // Add unique active class for each submenu active item
+        _.each($submenus, function (submenu) {
+            var $elements = _getSelectClassElements($(submenu));
+            _processSelectClassElements($elements);
         });
 
+        // Add unique active class for out-of-submenu active item
+        var $externalElements = _getSelectClassElements(this.$el)
+            .not('.dropdown-submenu *, .dropdown-submenu');
+        _processSelectClassElements($externalElements);
+
+        function _getSelectClassElements($el) {
+            return $el.find('[data-select-class]')
+                .addBack('[data-select-class]');
+        }
         function _processSelectClassElements($elements) {
             var maxNbClasses = -1;
-            $elements.filter('[data-select-class]')
-                .removeClass('active')
+            $elements.removeClass('active')
                 .filter(function () {
                     var className = $(this).data('selectClass');
                     var nbClasses = className ? className.split(' ').length : 0;
@@ -402,6 +416,9 @@ registry.sizing = SnippetOption.extend({
         this.$handles.on('mousedown', function (ev) {
             ev.preventDefault();
 
+            // First update size values as some element sizes may not have been
+            // initialized on option start (hidden slides, etc)
+            resizeValues = self._getSize();
             var $handle = $(ev.currentTarget);
 
             var compass = false;
@@ -473,7 +490,7 @@ registry.sizing = SnippetOption.extend({
             };
             var body_mouseup = function () {
                 $body.off('mousemove', body_mousemove);
-                $body.off('mouseup', body_mouseup);
+                $(window).off('mouseup', body_mouseup);
                 $body.removeClass(cursor);
                 $handle.removeClass('o_active');
 
@@ -494,7 +511,7 @@ registry.sizing = SnippetOption.extend({
                 }, 0);
             };
             $body.on('mousemove', body_mousemove);
-            $body.on('mouseup', body_mouseup);
+            $(window).on('mouseup', body_mouseup);
         });
 
         return def;
@@ -665,9 +682,10 @@ registry.colorpicker = SnippetOption.extend({
                 $pt.find('.note-palette-title').text(this.data.paletteTitle);
             }
 
-            // Remove excluded palettes
+            // Remove excluded palettes (note: only hide them to still be able
+            // to remove their related colors on the DOM target)
             _.each(excluded, function (exc) {
-                $clpicker.find('[data-name="' + exc + '"]').remove();
+                $clpicker.find('[data-name="' + exc + '"]').addClass('d-none');
             });
 
             // Add common colors to palettes if not excluded
@@ -689,6 +707,8 @@ registry.colorpicker = SnippetOption.extend({
             this.$el.find('.dropdown-menu').append($pt);
         }
 
+        this._addCompatibilityColors(['primary', 'secondary', 'success', 'info', 'warning', 'danger']);
+
         var classes = [];
         this.$el.find('.colorpicker button').each(function () {
             var $color = $(this);
@@ -707,6 +727,30 @@ registry.colorpicker = SnippetOption.extend({
         this.classes = classes.join(' ');
 
         return res;
+    },
+
+    //--------------------------------------------------------------------------
+    // Private
+    //--------------------------------------------------------------------------
+
+    /**
+     * Hardcode some existing colors (but make them hidden in the colorpicker)
+     * so they can be removed from snippets when selecting another color.
+     * Normally, the chosable colors do not contain them, which prevents them to
+     * be removed. For example, normally, the 'alpha' and 'beta' color (which
+     * are the same as primary and secondary) are displayed instead of their
+     * duplicates... but not for all themes.
+     *
+     * @private
+     * @param {string[]} colorNames
+     */
+    _addCompatibilityColors: function (colorNames) {
+        var $colorpicker = this.$el.find('.colorpicker');
+        _.each(colorNames, function (colorName) {
+            if (!$colorpicker.find('button[data-color="' + colorName + '"]').length) {
+                $colorpicker.append($('<button/>', {'class': 'd-none', 'data-color': colorName}));
+            }
+        });
     },
 
     //--------------------------------------------------------------------------
@@ -756,7 +800,7 @@ registry.colorpicker = SnippetOption.extend({
         if ($selected.length) {
             if ($selected.data('color')) {
                 this.$target.addClass(this.colorPrefix + $selected.data('color'));
-            } else {
+            } else if ($selected.hasClass('o_custom_color')) {
                 this.$target.css('background-color', $selected.css('background-color'));
             }
         }
@@ -833,7 +877,6 @@ registry.background = SnippetOption.extend({
         var $editable = this.$target.closest('.o_editable');
         var _editor = new weWidgets.MediaDialog(this, {
             onlyImages: true,
-            firstFilters: ['background'],
             res_model: $editable.data('oe-model'),
             res_id: $editable.data('oe-id'),
         }, null, $image[0]).open();
@@ -1301,7 +1344,7 @@ registry.many2one = SnippetOption.extend({
                     });
                 });
         } else {
-            self.$target.html($li.data('name'));
+            self.$target.text($li.data('name'));
         }
 
         _.defer(function () {

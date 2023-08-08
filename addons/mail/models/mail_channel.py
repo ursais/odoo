@@ -5,13 +5,12 @@ import base64
 import logging
 import re
 
-from email.utils import formataddr
 from uuid import uuid4
 
 from odoo import _, api, fields, models, modules, tools
 from odoo.exceptions import AccessError, UserError, ValidationError
 from odoo.osv import expression
-from odoo.tools import ormcache, pycompat
+from odoo.tools import ormcache, pycompat, formataddr
 from odoo.tools.safe_eval import safe_eval
 
 MODERATION_FIELDS = ['moderation', 'moderator_ids', 'moderation_ids', 'moderation_notify', 'moderation_notify_msg', 'moderation_guidelines', 'moderation_guidelines_msg']
@@ -99,6 +98,7 @@ class Channel(models.Model):
         ('chat', 'Chat Discussion'),
         ('channel', 'Channel')],
         'Channel Type', default='channel')
+    is_chat = fields.Boolean(string='Is a chat', compute='_compute_is_chat', default=False)
     description = fields.Text('Description')
     uuid = fields.Char('UUID', size=50, index=True, default=lambda self: str(uuid4()), copy=False)
     email_send = fields.Boolean('Send messages by email', default=False)
@@ -171,23 +171,23 @@ class Channel(models.Model):
     @api.constrains('moderator_ids')
     def _check_moderator_email(self):
         if any(not moderator.email for channel in self for moderator in channel.moderator_ids):
-            raise ValidationError("Moderators must have an email address.")
+            raise ValidationError(_("Moderators must have an email address."))
 
     @api.constrains('moderator_ids', 'channel_partner_ids', 'channel_last_seen_partner_ids')
     def _check_moderator_is_member(self):
         for channel in self:
             if not (channel.mapped('moderator_ids.partner_id') <= channel.sudo().channel_partner_ids):
-                raise ValidationError("Moderators should be members of the channel they moderate.")
+                raise ValidationError(_("Moderators should be members of the channel they moderate."))
 
     @api.constrains('moderation', 'email_send')
     def _check_moderation_parameters(self):
         if any(not channel.email_send and channel.moderation for channel in self):
-            raise ValidationError('Only mailing lists can be moderated.')
+            raise ValidationError(_('Only mailing lists can be moderated.'))
 
     @api.constrains('moderator_ids')
     def _check_moderator_existence(self):
         if any(not channel.moderator_ids for channel in self if channel.moderation):
-            raise ValidationError('Moderated channels must have moderators.')
+            raise ValidationError(_('Moderated channels must have moderators.'))
 
     @api.multi
     def _compute_is_member(self):
@@ -199,11 +199,15 @@ class Channel(models.Model):
         for record in self:
             record.is_member = record in membership_ids
 
+    @api.multi
+    def _compute_is_chat(self):
+        for record in self:
+            if record.channel_type == 'chat':
+                record.is_chat = True
+
     @api.onchange('public')
     def _onchange_public(self):
-        if self.public == 'public':
-            self.alias_contact = 'everyone'
-        else:
+        if self.public != 'public' and self.alias_contact == 'everyone':
             self.alias_contact = 'followers'
 
     @api.onchange('moderator_ids')
@@ -274,7 +278,7 @@ class Channel(models.Model):
         # First checks if user tries to modify moderation fields and has not the right to do it.
         if any(key for key in MODERATION_FIELDS if vals.get(key)) and any(self.env.user not in channel.moderator_ids for channel in self if channel.moderation):
             if not self.env.user.has_group('base.group_system'):
-                raise UserError("You do not possess the rights to modify fields related to moderation on one of the channels you are modifying.")
+                raise UserError(_("You do not have the rights to modify fields related to moderation on one of the channels you are modifying."))
 
         tools.image_resize_images(vals)
         result = super(Channel, self).write(vals)
@@ -370,7 +374,7 @@ class Channel(models.Model):
         # real mailing list: multiple recipients (hidden by X-Forge-To)
         if self.alias_domain and self.alias_name:
             return {
-                'email_to': ','.join(formataddr((partner.name, partner.email)) for partner in whitelist),
+                'email_to': ','.join(formataddr((partner.name, partner.email)) for partner in whitelist if partner.email),
                 'recipient_ids': [],
             }
         return super(Channel, self)._notify_email_recipients(message, whitelist.ids)
@@ -415,7 +419,7 @@ class Channel(models.Model):
 
         # Notifies the message author when his message is pending moderation if required on channel.
         # The fields "email_from" and "reply_to" are filled in automatically by method create in model mail.message.
-        if self.moderation_notify and self.moderation_notify_msg and message_type == 'email' and moderation_status == 'pending_moderation':
+        if self.moderation_notify and self.moderation_notify_msg and message_type in ['email','comment'] and moderation_status == 'pending_moderation':
             self.env['mail.mail'].create({
                 'body_html': self.moderation_notify_msg,
                 'subject': 'Re: %s' % (kwargs.get('subject', '')),
@@ -451,9 +455,9 @@ class Channel(models.Model):
         if self.env.user in self.moderator_ids or self.env.user.has_group('base.group_system'):
             success = self._send_guidelines(self.channel_partner_ids)
             if not success:
-                raise UserError('View "mail.mail_channel_send_guidelines" was not found. No email has been sent. Please contact an administrator to fix this issue.')
+                raise UserError(_('View "mail.mail_channel_send_guidelines" was not found. No email has been sent. Please contact an administrator to fix this issue.'))
         else:
-            raise UserError("Only an administrator or a moderator can send guidelines to channel members!")
+            raise UserError(_("Only an administrator or a moderator can send guidelines to channel members!"))
 
     @api.multi
     def _send_guidelines(self, partners):
@@ -738,6 +742,8 @@ class Channel(models.Model):
             :param partner_ids : list of partner id to add
         """
         partners = self.env['res.partner'].browse(partner_ids)
+        self._invite_check_access(partners)
+
         # add the partner
         for channel in self:
             partners_to_add = partners - channel.channel_partner_ids
@@ -756,6 +762,20 @@ class Channel(models.Model):
 
         # broadcast the channel header to the added partner
         self._broadcast(partner_ids)
+
+    def _invite_check_access(self, partners):
+        """ Check invited partners could match channel access """
+        failed = []
+        if any(channel.public == 'groups' for channel in self):
+            for channel in self.filtered(lambda c: c.public == 'groups'):
+                invalid_partners = [partner for partner in partners if channel.group_public_id not in partner.mapped('user_ids.groups_id')]
+                failed += [(channel, partner) for partner in invalid_partners]
+
+        if failed:
+            raise UserError(
+                _('Following invites are invalid as user groups do not match: %s') %
+                  ', '.join('%s (channel %s)' % (partner.name, channel.name) for channel, partner in failed)
+            )
 
     def _can_invite(self, partner_id):
         """Return True if the current user can invite the partner to the channel."""

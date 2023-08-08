@@ -44,6 +44,7 @@ Wizards provided by this module:
     'data': [
         'data/res.country.state.csv',
         'data/account_chart_template_data.xml',
+        'data/account.account.template.csv',
         'data/account_pcmn_belgium_data.xml',
         'data/account_data.xml',
         'data/account_tax_template_data.xml',
@@ -58,4 +59,5 @@ Wizards provided by this module:
         'demo/l10n_be_demo.xml',
     ],
     'post_init_hook': 'load_translations',
+    'license': 'LGPL-3',
 }

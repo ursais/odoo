@@ -5,17 +5,16 @@
 # Translators:
 # Anatolij, 2018
 # Silvija Butko <silvija.butko@gmail.com>, 2018
-# Šarūnas Ažna <sarunas.azna@gmail.com>, 2018
 # digitouch UAB <digitouchagencyeur@gmail.com>, 2018
-# Linas Versada <linaskrisiukenas@gmail.com>, 2018
+# Linas Versada <linaskrisiukenas@gmail.com>, 2019
 # 
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server saas~11.5\n"
+"Project-Id-Version: Odoo Server 12.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2018-09-21 13:17+0000\n"
+"POT-Creation-Date: 2019-11-14 07:34+0000\n"
 "PO-Revision-Date: 2018-08-24 09:21+0000\n"
-"Last-Translator: Linas Versada <linaskrisiukenas@gmail.com>, 2018\n"
+"Last-Translator: Linas Versada <linaskrisiukenas@gmail.com>, 2019\n"
 "Language-Team: Lithuanian (https://www.transifex.com/odoo/teams/41243/lt/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -24,9 +23,22 @@ msgstr ""
 "Plural-Forms: nplurals=4; plural=(n % 10 == 1 && (n % 100 > 19 || n % 100 < 11) ? 0 : (n % 10 >= 2 && n % 10 <=9) && (n % 100 > 19 || n % 100 < 11) ? 1 : n % 1 != 0 ? 2: 3);\n"
 
 #. module: payment_authorize
+#: code:addons/payment_authorize/controllers/main.py:62
+#, python-format
+msgid ""
+" If you don't have any account, ask your salesperson to grant you a portal "
+"access. "
+msgstr ""
+
+#. module: payment_authorize
 #: model:ir.model.fields,field_description:payment_authorize.field_payment_acquirer__authorize_login
 msgid "API Login Id"
 msgstr "API prisijungimo ID"
+
+#. module: payment_authorize
+#: model:ir.model.fields,field_description:payment_authorize.field_payment_acquirer__authorize_signature_key
+msgid "API Signature Key"
+msgstr ""
 
 #. module: payment_authorize
 #: model:ir.model.fields,field_description:payment_authorize.field_payment_acquirer__authorize_transaction_key
@@ -76,12 +88,12 @@ msgstr "Kortelės numeris"
 #. module: payment_authorize
 #: model_terms:ir.ui.view,arch_db:payment_authorize.authorize_s2s_form
 msgid "Cardholder name"
-msgstr "Kortelės savininko vardas"
+msgstr "Kortelės turėtojo vardas"
 
 #. module: payment_authorize
 #: model_terms:ir.ui.view,arch_db:payment_authorize.authorize_s2s_form
 msgid "Expires (MM / YY)"
-msgstr "Galiojimas (Mėnuo/ Metai)"
+msgstr "Galioja (Mėnuo/ Metai)"
 
 #. module: payment_authorize
 #: model_terms:ir.ui.view,arch_db:payment_authorize.acquirer_form_authorize
@@ -89,22 +101,14 @@ msgid "How to get paid with Authorize.Net"
 msgstr "Kaip gauti mokėjimą per Authorize.Net"
 
 #. module: payment_authorize
-#: code:addons/payment_authorize/controllers/main.py:64
-#, python-format
-msgid ""
-"If you don't have any account, please ask your salesperson to update your "
-"profile. "
-msgstr ""
-"Jei neturite jokios sąskaitos, paprašykite savo pardavimų specialisto, kad "
-"atnaujintų jūsų profilį."
-
-#. module: payment_authorize
-#: code:addons/payment_authorize/models/payment.py:261
+#: code:addons/payment_authorize/models/payment.py:292
 #, python-format
 msgid ""
 "Invalid token found: the Authorize profile is missing.Please make sure the "
 "token has a valid acquirer reference."
 msgstr ""
+"Rastas netinkamas raktas: trūksta patvirtinimo profilio. Įsitikinkite, kad "
+"raktas turi teisingą surinkėjo numerį."
 
 #. module: payment_authorize
 #: selection:payment.acquirer,provider:0
@@ -150,8 +154,8 @@ msgstr "Užpildykite savo profilį."
 #. module: payment_authorize
 #: code:addons/payment_authorize/controllers/main.py:61
 #, python-format
-msgid "Please sign in to complete your profile."
-msgstr "Norėdami užbaigti profilio pildymą, prisijunkite."
+msgid "Please sign in to complete the payment."
+msgstr ""
 
 #. module: payment_authorize
 #: model:ir.model.fields,field_description:payment_authorize.field_payment_acquirer__provider
@@ -215,4 +219,4 @@ msgstr ""
 #. module: payment_authorize
 #: selection:payment.acquirer,provider:0
 msgid "Wire Transfer"
-msgstr "Pavedimu"
+msgstr "Piniginė perlaida"

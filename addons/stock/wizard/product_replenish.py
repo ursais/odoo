@@ -66,13 +66,13 @@ class ProductReplenish(models.TransientModel):
 
     def _prepare_run_values(self):
         replenishment = self.env['procurement.group'].create({
-            'partner_id': self.product_id.responsible_id.partner_id.id,
+            'partner_id': self.product_id.responsible_id.sudo().partner_id.id,
         })
 
         values = {
             'warehouse_id': self.warehouse_id,
             'route_ids': self.route_ids,
-            'date_planned': self.date_planned,
+            'date_planned': self.date_planned or fields.Datetime.now(),
             'group_id': replenishment,
         }
         return values

@@ -141,7 +141,8 @@ class IrTranslationImport(object):
                            WHERE type = 'code'
                            AND noupdate IS NOT TRUE
                            ON CONFLICT (type, lang, md5(src)) WHERE type = 'code'
-                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments);
+                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments)
+                            WHERE EXCLUDED.value IS NOT NULL AND EXCLUDED.value != '';
                        """ % (self._model_table, self._table))
             count += cr.rowcount
             cr.execute(""" INSERT INTO %s(name, lang, res_id, src, type, value, module, state, comments)
@@ -150,7 +151,8 @@ class IrTranslationImport(object):
                            WHERE type = 'model'
                            AND noupdate IS NOT TRUE
                            ON CONFLICT (type, lang, name, res_id) WHERE type = 'model'
-                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments);
+                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments)
+                            WHERE EXCLUDED.value IS NOT NULL AND EXCLUDED.value != '';
                        """ % (self._model_table, self._table))
             count += cr.rowcount
             cr.execute(""" INSERT INTO %s(name, lang, res_id, src, type, value, module, state, comments)
@@ -159,7 +161,8 @@ class IrTranslationImport(object):
                            WHERE type IN ('selection', 'constraint', 'sql_constraint')
                            AND noupdate IS NOT TRUE
                            ON CONFLICT (type, lang, name, md5(src)) WHERE type IN ('selection', 'constraint', 'sql_constraint')
-                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments);
+                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments)
+                            WHERE EXCLUDED.value IS NOT NULL AND EXCLUDED.value != '';
                        """ % (self._model_table, self._table))
             count += cr.rowcount
             cr.execute(""" INSERT INTO %s(name, lang, res_id, src, type, value, module, state, comments)
@@ -168,7 +171,8 @@ class IrTranslationImport(object):
                            WHERE type = 'model_terms'
                            AND noupdate IS NOT TRUE
                            ON CONFLICT (type, name, lang, res_id, md5(src))
-                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments);
+                            DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) = (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type, EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments)
+                            WHERE EXCLUDED.value IS NOT NULL AND EXCLUDED.value != '';
                        """ % (self._model_table, self._table))
             count += cr.rowcount
         cr.execute(""" INSERT INTO %s(name, lang, res_id, src, type, value, module, state, comments)
@@ -232,7 +236,7 @@ class IrTranslation(models.Model):
         '''
         for record in self:
             record.source = record.src
-            if record.type != 'model':
+            if record.type != 'model' or not record.name:
                 continue
             model_name, field_name = record.name.split(',')
             if model_name not in self.env:
@@ -243,7 +247,13 @@ class IrTranslation(models.Model):
                 continue
             if not callable(field.translate):
                 # Pass context without lang, need to read real stored field, not translation
-                result = model.browse(record.res_id).with_context(lang=None).read([field_name])
+                try:
+                    result = model.browse(record.res_id).with_context(lang=None).read([field_name])
+                except AccessError:
+                    # because we can read self but not the record,
+                    # that means we would get an access error when accessing the translations
+                    # so instead we defer the access right to the "check" method
+                    result = [{field_name: _("Cannot be translated; record not accessible.")}]
                 record.source = result[0][field_name] if result else False
 
     def _inverse_source(self):
@@ -341,7 +351,7 @@ class IrTranslation(models.Model):
         existing_ids = [row[0] for row in self._cr.fetchall()]
 
         # create missing translations
-        self.create([{
+        self.sudo().create([{
                 'lang': lang,
                 'type': tt,
                 'name': name,
@@ -484,6 +494,8 @@ class IrTranslation(models.Model):
             for translation in translations:
                 if translation.src == translation.value:
                     discarded += translation
+                    # consider it done to avoid being matched against another term
+                    done.add((translation.src, translation.lang))
                 elif translation.src in terms:
                     done.add((translation.src, translation.lang))
                 else:
@@ -533,7 +545,7 @@ class IrTranslation(models.Model):
         """ Check access rights of operation ``mode`` on ``self`` for the
         current user. Raise an AccessError in case conditions are not met.
         """
-        if self.env.user._is_admin():
+        if self.env.user._is_superuser():
             return
 
         # collect translated field records (model_ids) and other translations
@@ -665,6 +677,47 @@ class IrTranslation(models.Model):
         self._modified_model(field.model_name)
 
     @api.model
+    def _upsert_translations(self, vals_list):
+        """ Insert or update translations of type 'model' or 'model_terms'.
+
+            This method is used for creations of translations where the given
+            ``vals_list`` is trusted to be the right values and potential
+            conflicts should be updated to the new given value.
+        """
+        rows_by_type = defaultdict(list)
+        for vals in vals_list:
+            rows_by_type[vals['type']].append((
+                vals['name'], vals['lang'], vals['res_id'], vals['src'] or '', vals['type'],
+                vals.get('module'), vals['value'] or '', vals.get('state'), vals.get('comments'),
+            ))
+
+        if rows_by_type['model']:
+            query = """
+                INSERT INTO ir_translation (name, lang, res_id, src, type,
+                                            module, value, state, comments)
+                VALUES {}
+                ON CONFLICT (type, lang, name, res_id) WHERE type='model'
+                DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) =
+                    (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type,
+                     EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments)
+                WHERE EXCLUDED.value IS NOT NULL AND EXCLUDED.value != '';
+            """.format(", ".join(["%s"] * len(rows_by_type['model'])))
+            self.env.cr.execute(query, rows_by_type['model'])
+
+        if rows_by_type['model_terms']:
+            query = """
+                INSERT INTO ir_translation (name, lang, res_id, src, type,
+                                            module, value, state, comments)
+                VALUES {}
+                ON CONFLICT (type, name, lang, res_id, md5(src))
+                DO UPDATE SET (name, lang, res_id, src, type, value, module, state, comments) =
+                    (EXCLUDED.name, EXCLUDED.lang, EXCLUDED.res_id, EXCLUDED.src, EXCLUDED.type,
+                     EXCLUDED.value, EXCLUDED.module, EXCLUDED.state, EXCLUDED.comments)
+                WHERE EXCLUDED.value IS NOT NULL AND EXCLUDED.value != '';
+            """.format(", ".join(["%s"] * len(rows_by_type['model_terms'])))
+            self.env.cr.execute(query, rows_by_type['model_terms'])
+
+    @api.model
     def translate_fields(self, model, id, field=None):
         """ Open a view for translating the field(s) of the record (model, id). """
         main_lang = 'en_US'
@@ -699,7 +752,7 @@ class IrTranslation(models.Model):
             self.insert_missing(fld, rec)
 
         action = {
-            'name': 'Translate',
+            'name': _('Translate'),
             'res_model': 'ir.translation',
             'type': 'ir.actions.act_window',
             'view_mode': 'tree',

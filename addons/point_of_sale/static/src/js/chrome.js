@@ -741,9 +741,6 @@ var Chrome = PosBaseWidget.extend(AbstractAction.prototype, {
         if(err.message === 'XmlHttpRequestError '){
             title = 'Network Failure (XmlHttpRequestError)';
             body  = 'The Point of Sale could not be loaded due to a network problem.\n Please check your internet connection.';
-        }else if(err.message === 'TLSError'){
-            title = 'Https connection to IoT Box failed';
-            body = 'Make sure you are using IoT Box v18.10 or higher.\n\n Navigate to ' + err.url + ' to accept the certificate of your IoT Box.';
         }else if(err.code === 200){
             title = err.data.message;
             body  = err.data.debug;
@@ -837,6 +834,9 @@ var Chrome = PosBaseWidget.extend(AbstractAction.prototype, {
                         },2000);
                     } else {
                         clearTimeout(this.confirmed);
+                        this.$el.removeClass('confirm');
+                        this.$el.text(_t('Close'));
+                        this.confirmed = false;
                         this.gui.close();
                     }
                 },

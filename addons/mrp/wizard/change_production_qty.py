@@ -30,7 +30,10 @@ class ChangeProductionQty(models.TransientModel):
     def _update_product_to_produce(self, production, qty, old_qty):
         production_move = production.move_finished_ids.filtered(lambda x: x.product_id.id == production.product_id.id and x.state not in ('done', 'cancel'))
         if production_move:
-            production_move.write({'product_uom_qty': qty})
+            production_move._decrease_reserved_quanity(qty)
+            production_move.with_context(do_not_unreserve=True).write({'product_uom_qty': qty})
+            production_move._recompute_state()
+            production_move._action_assign()
         else:
             production_move = production._generate_finished_moves()
             production_move = production.move_finished_ids.filtered(lambda x: x.state not in ('done', 'cancel') and production.product_id.id == x.product_id.id)
@@ -53,17 +56,24 @@ class ChangeProductionQty(models.TransientModel):
             factor = production.product_uom_id._compute_quantity(production.product_qty - qty_produced, production.bom_id.product_uom_id) / production.bom_id.product_qty
             boms, lines = production.bom_id.explode(production.product_id, factor, picking_type=production.bom_id.picking_type_id)
             documents = {}
-            done_quantities = {move: move.quantity_done for move in production.move_raw_ids}
             for line, line_data in lines:
-                move, old_qty, new_qty = production._update_raw_move(line, line_data)
+                move = production.move_raw_ids.filtered(lambda x: x.bom_line_id.id == line.id and x.state not in ('done', 'cancel'))
+                if move:
+                    move = move[0]
+                    old_qty = move.product_uom_qty
+                else:
+                    old_qty = 0
                 iterate_key = production._get_document_iterate_key(move)
                 if iterate_key:
-                    document = self.env['stock.picking']._log_activity_get_documents({move: (new_qty, old_qty)}, iterate_key, 'UP')
+                    document = self.env['stock.picking']._log_activity_get_documents({move: (line_data['qty'], old_qty)}, iterate_key, 'UP')
                     for key, value in document.items():
                         if documents.get(key):
                             documents[key] += [value]
                         else:
                             documents[key] = [value]
+
+                production._update_raw_move(line, line_data)
+
             production._log_manufacture_exception(documents)
             operation_bom_qty = {}
             for bom, bom_data in boms:
@@ -73,9 +83,6 @@ class ChangeProductionQty(models.TransientModel):
             production._log_downside_manufactured_quantity(finished_moves_modification)
             moves = production.move_raw_ids.filtered(lambda x: x.state not in ('done', 'cancel'))
             moves._action_assign()
-            for move in production.move_raw_ids:
-                if move.quantity_done != done_quantities[move]:
-                    move._set_quantity_done(done_quantities[move])
             for wo in production.workorder_ids:
                 operation = wo.operation_id
                 if operation_bom_qty.get(operation.id):

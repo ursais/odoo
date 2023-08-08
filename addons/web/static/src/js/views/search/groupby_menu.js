@@ -100,7 +100,7 @@ var GroupByMenu = DropdownMenu.extend({
      * @private
      */
     start: function () {
-        this.$menu = this.$('.o_dropdown_menu');
+        this._super.apply(this, arguments);
         this.$menu.addClass('o_group_by_menu');
         var $generatorMenu = QWeb.render('GroupbyMenuGenerator', {widget: this});
         this.$menu.append($generatorMenu);
@@ -180,6 +180,7 @@ var GroupByMenu = DropdownMenu.extend({
     _toggleCustomGroupMenu: function () {
         this.generatorMenuIsOpen = !this.generatorMenuIsOpen;
         this._renderGeneratorMenu();
+        this.$addCustomGroup.attr('aria-expanded', this.generatorMenuIsOpen);
         if (this.generatorMenuIsOpen) {
             this.$groupSelector.focus();
         }

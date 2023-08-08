@@ -65,16 +65,24 @@ return Widget.extend({
 
         _.each(this.filters, this.append_filter.bind(this));
 
+        this.$dropdownReference = this.$('.o_dropdown_toggler_btn');
+        this.$menu = this.$('.o_favorites_menu');
+        if (_t.database.parameters.direction === 'rtl') {
+            this.$menu.addClass('dropdown-menu-right');
+        }
+
         return this._super();
     },
     toggle_save_menu: function (is_open) {
         this.$save_search
+            .attr('aria-expanded', !(_.isUndefined(is_open)) ? is_open : (this.$save_search.attr('aria-expanded') === 'false'))
             .toggleClass('o_closed_menu', !(_.isUndefined(is_open)) ? !is_open : undefined)
             .toggleClass('o_open_menu', is_open);
         this.$save_name.toggle(is_open);
         if (this.$save_search.hasClass('o_open_menu')) {
             this.$save_name.find('input').first().focus();
         }
+        this.$dropdownReference.dropdown('update');
     },
     _closeMenus: function () {
         this.toggle_save_menu(false);
@@ -195,6 +203,10 @@ return Widget.extend({
             icon: 'fa-star',
             field: {
                 get_context: function () {
+                    var filterContext = filter.context;
+                    if (typeof filter.context === 'string') {
+                        filterContext = pyUtils.eval('context', filter.context);
+                    }
                     var sortParsed = JSON.parse(filter.sort || "[]");
                     var orderedBy = [];
                     _.each(sortParsed, function (sort) {
@@ -204,7 +216,7 @@ return Widget.extend({
                         });
                     });
 
-                return _.defaults({}, filter.context, {orderedBy : orderedBy});
+                return _.defaults({}, filterContext, {orderedBy : orderedBy});
                 },
                 get_groupby: function () { return [filter.context]; },
                 // facet is not used
@@ -224,7 +236,7 @@ return Widget.extend({
         };
     },
     clear_selection: function () {
-        this.$('.selected').removeClass('selected');
+        this.$('.selected').removeClass('selected').attr('aria-checked', 'false');
     },
     /**
      * Adds a filter description to the filters dict
@@ -250,7 +262,7 @@ return Widget.extend({
             var $filter = $('<div>', {class: 'position-relative'})
                 .addClass(filter.user_id ? 'o-searchview-custom-private'
                                          : 'o-searchview-custom-public')
-                .append($('<a>', {href: '#', class: 'dropdown-item'}).text(filter.name))
+                .append($('<a>', {role: 'menuitemradio', href: '#', class: 'dropdown-item'}).text(filter.name))
                 .append($('<span>', {
                     class: 'fa fa-trash-o o-remove-filter',
                     on: {
@@ -273,7 +285,7 @@ return Widget.extend({
         });
         if (current) {
             this.query.remove(current);
-            this.$filters[this.key_for(filter)].find('.dropdown-item').removeClass('selected');
+            this.$filters[this.key_for(filter)].find('.dropdown-item').removeClass('selected').attr('aria-checked', 'false');
             return;
         }
         this.query.reset([this.facet_for(filter)], {
@@ -285,7 +297,7 @@ return Widget.extend({
             this.searchview.dataset.set_sort(sort_items);
         }
 
-        this.$filters[this.key_for(filter)].find('.dropdown-item').addClass('selected');
+        this.$filters[this.key_for(filter)].find('.dropdown-item').addClass('selected').attr('aria-checked', 'true');
     },
     remove_filter: function (filter, $filter, key) {
         var self = this;

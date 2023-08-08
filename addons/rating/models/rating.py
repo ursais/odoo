@@ -68,9 +68,18 @@ class Rating(models.Model):
     @api.multi
     @api.depends('rating')
     def _compute_rating_image(self):
+        # Due to some new widgets, we may have ratings different from 0/1/5/10 (e.g. slide.channel review)
+        # Let us have some custom rounding while finding a better solution for images.
         for rating in self:
+            rating_for_img = 0
+            if rating.rating >= 8:
+                rating_for_img = 10
+            elif rating.rating > 3:
+                rating_for_img = 5
+            elif rating.rating >= 1:
+                rating_for_img = 1
             try:
-                image_path = get_resource_path('rating', 'static/src/img', 'rating_%s.png' % (int(rating.rating),))
+                image_path = get_resource_path('rating', 'static/src/img', 'rating_%s.png' % rating_for_img)
                 rating.rating_image = base64.b64encode(open(image_path, 'rb').read())
             except (IOError, OSError):
                 rating.rating_image = False
@@ -360,7 +369,7 @@ class RatingMixin(models.AbstractModel):
         # build domain and fetch data
         domain = [('parent_res_model', '=', parent_records._name), ('parent_res_id', 'in', parent_records.ids), ('rating', '>=', 1), ('consumed', '=', True)]
         if rating_satisfaction_days:
-            domain += [('create_date', '>=', fields.Datetime.to_string(fields.datetime.now() - timedelta(days=rating_satisfaction_days)))]
+            domain += [('write_date', '>=', fields.Datetime.to_string(fields.datetime.now() - timedelta(days=rating_satisfaction_days)))]
         data = self.env['rating.rating'].read_group(domain, ['parent_res_id', 'rating'], ['parent_res_id', 'rating'], lazy=False)
 
         # get repartition of grades per parent id
