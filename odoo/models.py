@@ -34,7 +34,7 @@ import pytz
 import re
 import uuid
 from collections import defaultdict, MutableMapping, OrderedDict
-from contextlib import closing
+from contextlib import closing, contextmanager
 from inspect import getmembers, currentframe
 from operator import attrgetter, itemgetter
 
