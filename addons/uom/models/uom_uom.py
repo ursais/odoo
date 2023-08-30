@@ -83,9 +83,8 @@ class UoM(models.Model):
         self._cr.execute("""
             SELECT C.id AS category_id, count(U.id) AS uom_count
             FROM uom_category C
-            LEFT JOIN uom_uom U ON C.id = U.category_id AND uom_type = 'reference'
+            LEFT JOIN uom_uom U ON C.id = U.category_id AND uom_type = 'reference' AND U.active = 't'
             WHERE C.id IN %s
-                AND U.active = 't'
             GROUP BY C.id
         """, (tuple(category_ids),))
         for uom_data in self._cr.dictfetchall():
@@ -144,19 +143,26 @@ class UoM(models.Model):
                 - if true, raise an exception if the conversion is not possible (different UoM category),
                 - otherwise, return the initial quantity
         """
-        if not self:
+        if not self or not qty:
             return qty
         self.ensure_one()
-        if self.category_id.id != to_unit.category_id.id:
+
+        if self != to_unit and self.category_id.id != to_unit.category_id.id:
             if raise_if_failure:
                 raise UserError(_('The unit of measure %s defined on the order line doesn\'t belong to the same category than the unit of measure %s defined on the product. Please correct the unit of measure defined on the order line or on the product, they should belong to the same category.') % (self.name, to_unit.name))
             else:
                 return qty
-        amount = qty / self.factor
-        if to_unit:
-            amount = amount * to_unit.factor
-            if round:
-                amount = tools.float_round(amount, precision_rounding=to_unit.rounding, rounding_method=rounding_method)
+
+        if self == to_unit:
+            amount = qty
+        else:
+            amount = qty / self.factor
+            if to_unit:
+                amount = amount * to_unit.factor
+
+        if to_unit and round:
+            amount = tools.float_round(amount, precision_rounding=to_unit.rounding, rounding_method=rounding_method)
+
         return amount
 
     @api.multi

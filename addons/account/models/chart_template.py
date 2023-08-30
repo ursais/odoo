@@ -165,15 +165,16 @@ class AccountChartTemplate(models.Model):
         of accounts had been created for it yet.
         """
         self.ensure_one()
-        if request and request.db:
-            company_id = request.env.user.company_id.id
-            company = self.env['res.company'].browse(company_id)
+        # do not use `request.env` here, it can cause deadlocks
+        if request and request.session.uid:
+            current_user = self.env['res.users'].browse(request.uid)
+            company = current_user.company_id
         else:
             # fallback to company of current user, most likely __system__
             # (won't work well for multi-company)
             company = self.env.user.company_id
         # If we don't have any chart of account on this company, install this chart of account
-        if not company.chart_template_id:
+        if not company.chart_template_id and not self.existing_accounting(company):
             self.load_for_current_company(15.0, 15.0)
 
     def load_for_current_company(self, sale_tax_rate, purchase_tax_rate):
@@ -185,9 +186,10 @@ class AccountChartTemplate(models.Model):
         rights.
         """
         self.ensure_one()
-        if request and request.db:
-            company_id = request.env.user.company_id.id
-            company = self.env['res.company'].browse(company_id)
+        # do not use `request.env` here, it can cause deadlocks
+        if request and request.session.uid:
+            current_user = self.env['res.users'].browse(request.uid)
+            company = current_user.company_id
         else:
             # fallback to company of current user, most likely __system__
             # (won't work well for multi-company)
@@ -247,7 +249,8 @@ class AccountChartTemplate(models.Model):
         acc_template_ref, taxes_ref = self._install_template(company, code_digits=self.code_digits)
 
         # Set the transfer account on the company
-        company.transfer_account_id = self.env['account.account'].search([('code', '=like', self.transfer_account_code_prefix + '%')])[0]
+        company.transfer_account_id = self.env['account.account'].search([
+            ('code', '=like', self.transfer_account_code_prefix + '%'), ('company_id', '=', company.id)], limit=1)
 
         # Create Bank journals
         self._create_bank_journals(company, acc_template_ref)
@@ -268,7 +271,7 @@ class AccountChartTemplate(models.Model):
         """
         model_to_check = ['account.move.line', 'account.invoice', 'account.payment', 'account.bank.statement']
         for model in model_to_check:
-            if len(self.env[model].search([('company_id', '=', company_id.id)])) > 0:
+            if self.env[model].sudo().search([('company_id', '=', company_id.id)], limit=1):
                 return True
         return False
 

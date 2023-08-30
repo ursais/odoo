@@ -13,19 +13,11 @@ var optionalProductsMap = {};
 var OptionalProductsModal = Dialog.extend(ServicesMixin, ProductConfiguratorMixin, {
     events:  _.extend({}, Dialog.prototype.events, ProductConfiguratorMixin.events, {
         'click a.js_add, a.js_remove': '_onAddOrRemoveOption',
-        'change .in_cart.main_product input.js_quantity': '_onChangeQuantity'
+        'click button.js_add_cart_json': 'onClickAddCartJSON',
+        'change .in_cart.main_product input.js_quantity': '_onChangeQuantity',
     }),
     /**
      * Initializes the optional products modal
-     *
-     * If the "isWebsite" param is true, will also disable the following events:
-     * - change [data-attribute_exclusions]
-     * - click button.js_add_cart_json
-     *
-     * This has to be done because those events are already registered at the "website_sale"
-     * component level.
-     * This modal is part of the form that has these events registered and we
-     * want to avoid duplicates.
      *
      * @override
      * @param {$.Element} parent The parent container
@@ -67,11 +59,7 @@ var OptionalProductsModal = Dialog.extend(ServicesMixin, ProductConfiguratorMixi
         this.pricelistId = params.pricelistId;
         this.isWebsite = params.isWebsite;
         this.dialogClass = 'oe_optional_products_modal' + (params.isWebsite ? ' oe_website_sale' : '');
-
-        if (this.isWebsite) {
-            delete this.events['change [data-attribute_exclusions]'];
-            delete this.events['click button.js_add_cart_json'];
-        }
+        this._productImageField = 'image_medium';
     },
      /**
      * @override
@@ -157,6 +145,25 @@ var OptionalProductsModal = Dialog.extend(ServicesMixin, ProductConfiguratorMixi
     //--------------------------------------------------------------------------
 
     /**
+     * Computes and updates the total price, useful when a product is added or
+     * when the quantity is changed.
+     * TODO awa: add a container context to avoid global selectors ?
+     */
+    computePriceTotal: function () {
+        if ($('.js_price_total').length) {
+            var price = 0;
+            $('.js_product.in_cart').each(function () {
+                var quantity = parseInt($('input[name="add_qty"]').first().val());
+                price += parseFloat($(this).find('.js_raw_price').html()) * quantity;
+            });
+
+            $('.js_price_total .oe_currency_value').html(
+                this._priceToStr(parseFloat(price))
+            );
+        }
+        ProductConfiguratorMixin.computePriceTotal.apply(this, arguments);
+    },
+    /**
      * Returns the list of selected products.
      * The root product is added on top of the list.
      *
@@ -218,20 +225,27 @@ var OptionalProductsModal = Dialog.extend(ServicesMixin, ProductConfiguratorMixi
                  this.rootProduct.no_variant_attribute_values)) {
             var $productDescription = $modalContent
                 .find('.main_product')
-                .find('td.td-product_name div.text-muted.small');
-            var description = $productDescription.html();
+                .find('td.td-product_name div.text-muted.small > div:first');
+            var $updatedDescription = $('<div/>');
+            $updatedDescription.append($('<p>', {
+                text: $productDescription.text()
+            }));
 
             $.each(this.rootProduct.product_custom_attribute_values, function (){
-                description += '<br/>' + this.attribute_value_name + ': ' + this.custom_value;
+                $updatedDescription.append($('<div>', {
+                    text: this.attribute_value_name + ': ' + this.custom_value
+                }));
             });
 
             $.each(this.rootProduct.no_variant_attribute_values, function (){
                 if (this.is_custom !== 'True'){
-                    description += '<br/>' + this.attribute_name + ': ' + this.attribute_value_name;
+                    $updatedDescription.append($('<div>', {
+                        text: this.attribute_name + ': ' + this.attribute_value_name
+                    }));
                 }
             });
 
-            $productDescription.html(description);
+            $productDescription.replaceWith($updatedDescription);
         }
 
         return $modalContent;
@@ -314,20 +328,25 @@ var OptionalProductsModal = Dialog.extend(ServicesMixin, ProductConfiguratorMixi
             var $productDescription = $parent
                 .find('td.td-product_name div.float-left');
 
-            var description = '';
+            var $customAttributeValuesDescription = $('<div>', {
+                class: 'custom_attribute_values_description text-muted small'
+            });
+            if (productCustomVariantValues.length !== 0 || noVariantAttributeValues.length !== 0) {
+                $customAttributeValuesDescription.append($('<br/>'));
+            }
+
             $.each(productCustomVariantValues, function (){
-                description += '<br/>' + this.attribute_value_name + ': ' + this.custom_value;
+                $customAttributeValuesDescription.append($('<div>', {
+                    text: this.attribute_value_name + ': ' + this.custom_value
+                }));
             });
 
             $.each(noVariantAttributeValues, function (){
                 if (this.is_custom !== 'True'){
-                    description += '<br/>' + this.attribute_name + ': ' + this.attribute_value_name;
+                    $customAttributeValuesDescription.append($('<div>', {
+                        text: this.attribute_name + ': ' + this.attribute_value_name
+                    }));
                 }
-            });
-
-            var $customAttributeValuesDescription = $('<div>', {
-                class: 'custom_attribute_values_description text-muted small',
-                html: description
             });
 
             $productDescription.append($customAttributeValuesDescription);
@@ -440,7 +459,19 @@ var OptionalProductsModal = Dialog.extend(ServicesMixin, ProductConfiguratorMixi
             delete optionalProductsMap[optionId];
         }
     },
+    /**
+     * @override
+     */
+    _onChangeCombination:function (ev, $parent, combination) {
+        $parent
+            .find('.td-product_name .product-name')
+            .first()
+            .text(combination.display_name);
 
+        ProductConfiguratorMixin._onChangeCombination.apply(this, arguments);
+
+        this.computePriceTotal();
+    },
     /**
      * When the quantity of the root product is updated, we need to update
      * the quantity of all the selected optional products.

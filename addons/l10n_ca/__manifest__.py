@@ -40,7 +40,7 @@ position.
     ],
     'data': [
         'data/account_chart_template_data.xml',
-        'data/l10n_ca_chart_data.xml',
+        'data/account.account.template.csv',
         'data/account_chart_template_after_data.xml',
         'data/account_data.xml',
         'data/account_tax_data.xml',
@@ -49,4 +49,5 @@ position.
         'data/res_company_data.xml',
     ],
     'post_init_hook': 'load_translations',
+    'license': 'LGPL-3',
 }

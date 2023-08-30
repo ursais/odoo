@@ -26,6 +26,7 @@ class MailTestStandard(models.Model):
     email_from = fields.Char()
     user_id = fields.Many2one('res.users', 'Responsible', track_visibility='onchange')
     umbrella_id = fields.Many2one('mail.test', track_visibility='onchange')
+    company_id = fields.Many2one('res.company')
 
 
 class MailTestActivity(models.Model):
@@ -36,6 +37,7 @@ class MailTestActivity(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin']
 
     name = fields.Char()
+    date = fields.Date()
     email_from = fields.Char()
     active = fields.Boolean(default=True)
 

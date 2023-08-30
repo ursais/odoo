@@ -31,7 +31,6 @@ class ImportWarning(Warning):
 class ConversionNotFound(ValueError):
     pass
 
-
 class IrFieldsConverter(models.AbstractModel):
     _name = 'ir.fields.converter'
     _description = 'Fields Converter'
@@ -84,6 +83,8 @@ class IrFieldsConverter(models.AbstractModel):
                             # uniform handling
                             w = ImportWarning(w)
                         log(field, w)
+                except (UnicodeEncodeError, UnicodeDecodeError) as e:
+                    log(field, ValueError(str(e)))
                 except ValueError as e:
                     log(field, e)
             return converted
@@ -318,6 +319,8 @@ class IrFieldsConverter(models.AbstractModel):
         RelatedModel = self.env[field.comodel_name]
         if subfield == '.id':
             field_type = _(u"database id")
+            if isinstance(value, str) and not self._str_to_boolean(model, field, value)[0]:
+                return False, field_type, warnings
             try: tentative_id = int(value)
             except ValueError: tentative_id = value
             try:
@@ -332,6 +335,8 @@ class IrFieldsConverter(models.AbstractModel):
                     {'moreinfo': action})
         elif subfield == 'id':
             field_type = _(u"external id")
+            if not self._str_to_boolean(model, field, value)[0]:
+                return False, field_type, warnings
             if '.' in value:
                 xmlid = value
             else:
@@ -340,6 +345,8 @@ class IrFieldsConverter(models.AbstractModel):
             id = self.env['ir.model.data'].xmlid_to_res_id(xmlid, raise_if_not_found=False) or None
         elif subfield is None:
             field_type = _(u"name")
+            if value == '':
+                return False, field_type, warnings
             flush()
             ids = RelatedModel.name_search(name=value, operator='=')
             if ids:

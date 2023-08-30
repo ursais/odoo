@@ -21,6 +21,7 @@ this event.
     'depends': ['event', 'sale_management'],
     'data': [
         'views/event_views.xml',
+        'views/event_views_template.xml',
         'views/product_views.xml',
         'views/sale_order_views.xml',
         'data/event_sale_data.xml',
@@ -31,5 +32,6 @@ this event.
     ],
     'demo': ['data/event_demo.xml'],
     'installable': True,
-    'auto_install': True
+    'auto_install': True,
+    'license': 'LGPL-3',
 }

@@ -59,6 +59,8 @@ class MigrationManager(object):
         Python file names must start by `pre-` or `post-` and will be executed, respectively,
         before and after the module initialisation. `end-` scripts are run after all modules have
         been updated.
+        A special folder named `0.0.0` can contain scripts that will be run on any version change.
+        In `pre` stage, `0.0.0` scripts are run first, while in `post` and `end`, they are run last.
         Example:
             <moduledir>
             `-- migrations
@@ -71,6 +73,8 @@ class MigrationManager(object):
                 |-- 9.0.1.1                             # processed only on a 9.0 server
                 |   |-- pre-delete_table_z.py
                 |   `-- post-clean-data.py
+                |-- 0.0.0
+                |   `-- end-invariants.py               # processed on all version update
                 `-- foo.py                              # not processed
     """
 
@@ -117,13 +121,20 @@ class MigrationManager(object):
                 return version  # the version number already containt the server version
             return "%s.%s" % (release.major_version, version)
 
-        def _get_migration_versions(pkg):
+        def _get_migration_versions(pkg, stage):
             versions = sorted({
                 ver
                 for lv in self.migrations[pkg.name].values()
                 for ver, lf in lv.items()
                 if lf
             }, key=lambda k: parse_version(convert_version(k)))
+            if "0.0.0" in versions:
+                # reorder versions
+                versions.remove("0.0.0")
+                if stage == "pre":
+                    versions.insert(0, "0.0.0")
+                else:
+                    versions.append("0.0.0")
             return versions
 
         def _get_migration_files(pkg, version, stage):
@@ -150,11 +161,24 @@ class MigrationManager(object):
         parsed_installed_version = parse_version(installed_version)
         current_version = parse_version(convert_version(pkg.data['version']))
 
-        versions = _get_migration_versions(pkg)
+        def compare(version):
+            if version == "0.0.0" and parsed_installed_version < current_version:
+                return True
 
+            full_version = convert_version(version)
+            majorless_version = (version != full_version)
+
+            if majorless_version:
+                # We should not re-execute major-less scripts when upgrading to new Odoo version
+                # a module in `9.0.2.0` should not re-execute a `2.0` script when upgrading to `10.0.2.0`.
+                # In which case we must compare just the module version
+                return parsed_installed_version[2:] < parse_version(full_version)[2:] <= current_version[2:]
+
+            return parsed_installed_version < parse_version(full_version) <= current_version
+
+        versions = _get_migration_versions(pkg, stage)
         for version in versions:
-            if parsed_installed_version < parse_version(convert_version(version)) <= current_version:
-
+            if compare(version):
                 strfmt = {'addon': pkg.name,
                           'stage': stage,
                           'version': stageformat[stage] % version,

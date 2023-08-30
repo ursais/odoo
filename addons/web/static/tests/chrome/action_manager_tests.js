@@ -1143,6 +1143,50 @@ QUnit.module('ActionManager', {
         actionManager.destroy();
     });
 
+    QUnit.test('state.sa should load action from session', function (assert) {
+        assert.expect(1);
+
+        var actionManager = createActionManager({
+            actions: this.actions,
+            archs: this.archs,
+            data: this.data,
+            mockRPC: function (route, args) {
+                if (route === '/web/session/get_session_action') {
+                    return $.when(1);
+                }
+                return this._super.apply(this, arguments);
+            },
+        });
+        actionManager.loadState({
+            sa: 1,
+        });
+
+        assert.strictEqual(actionManager.$('.o_kanban_view').length, 1,
+            "should have rendered a kanban view");
+
+        actionManager.destroy();
+    });
+
+    QUnit.test('state with integer active_ids should not crash', function (assert) {
+        assert.expect(0);
+
+        var actionManager = createActionManager({
+            actions: this.actions,
+            mockRPC: function (route, args) {
+                if (route === '/web/action/run') {
+                    return $.when();
+                }
+                return this._super.apply(this, arguments);
+            },
+        });
+        actionManager.loadState({
+            action: 2,
+            active_ids: 3,
+        });
+
+        actionManager.destroy();
+    });
+
     QUnit.module('Concurrency management');
 
     QUnit.test('drop previous actions if possible', function (assert) {
@@ -3071,7 +3115,7 @@ QUnit.module('ActionManager', {
             intercepts: {
                 create_filter: function (event) {
                     var filter = event.data.filter;
-                    assert.deepEqual(filter.domain, "[('bar', '=', 1)]",
+                    assert.deepEqual(filter.domain, `[("bar", "=", 1)]`,
                         "should save the correct domain");
                     assert.deepEqual(filter.context, {shouldBeInFilterContext: true},
                         "should save the correct context");

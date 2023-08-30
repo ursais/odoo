@@ -219,6 +219,7 @@ var Session = core.Class.extend(mixins.EventDispatcherMixin, {
         return loaded.then(function () {
             return self.load_js(file_list);
         }).done(function () {
+            self._configureLocale();
             self.on_modules_loaded();
             self.trigger('module_loaded');
        });
@@ -252,6 +253,20 @@ var Session = core.Class.extend(mixins.EventDispatcherMixin, {
             });
         });
         return this.qweb_mutex.def;
+    },
+     /**
+     * Sets first day of week in current locale according to the user language.
+     *
+     * @private
+     */
+    _configureLocale: function () {
+        var dow = (_t.database.parameters.week_start || 0) % 7;
+        moment.updateLocale(moment.locale(), {
+            week: {
+                dow: dow,
+                doy: 7 + dow - 4 // Note: ISO 8601 week date: https://momentjscom.readthedocs.io/en/latest/moment/07-customization/16-dow-doy/
+            },
+        });
     },
     on_modules_loaded: function () {
         var openerp = window.openerp;

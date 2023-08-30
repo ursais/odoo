@@ -73,9 +73,9 @@ class View(models.Model):
             website_specific_view = view.copy(copy_vals)
 
             view._create_website_specific_pages_for_view(website_specific_view,
-                                                            view.env['website'].browse(current_website_id))
+                                                         view.env['website'].browse(current_website_id))
 
-            for inherit_child in view.inherit_children_ids.filter_duplicate():
+            for inherit_child in view.inherit_children_ids.filter_duplicate().sorted(key=lambda v: (v.priority, v.id)):
                 if inherit_child.website_id.id == current_website_id:
                     # In the case the child was already specific to the current
                     # website, we cannot just reattach it to the new specific
@@ -83,7 +83,8 @@ class View(models.Model):
                     # original tree. Indeed, the order of children 'id' fields
                     # must remain the same so that the inheritance is applied
                     # in the same order in the copied tree.
-                    inherit_child.copy({'inherit_id': website_specific_view.id, 'key': inherit_child.key})
+                    child = inherit_child.copy({'inherit_id': website_specific_view.id, 'key': inherit_child.key})
+                    inherit_child.inherit_children_ids.write({'inherit_id': child.id})
                     inherit_child.unlink()
                 else:
                     # Trigger COW on inheriting views
@@ -92,6 +93,49 @@ class View(models.Model):
             super(View, website_specific_view).write(vals)
 
         return True
+
+    def _load_records_write_on_cow(self, cow_view, inherit_id, values):
+        inherit_id = self.search([
+            ('key', '=', self.browse(inherit_id).key),
+            ('website_id', 'in', (False, cow_view.website_id.id)),
+        ], order='website_id', limit=1).id
+        values['inherit_id'] = inherit_id
+        cow_view.with_context(no_cow=True).write(values)
+
+    def _create_all_specific_views(self, processed_modules):
+        """ When creating a generic child view, we should
+            also create that view under specific view trees (COW'd).
+            Top level view (no inherit_id) do not need that behavior as they
+            will be shared between websites since there is no specific yet.
+        """
+        # Only for the modules being processed
+        regex = '^(%s)[.]' % '|'.join(processed_modules)
+        # Retrieve the views through a SQl query to avoid ORM queries inside of for loop
+        # Retrieves all the views that are missing their specific counterpart with all the
+        # specific view parent id and their website id in one query
+        query = """
+            SELECT generic.id, ARRAY[array_agg(spec_parent.id), array_agg(spec_parent.website_id)]
+              FROM ir_ui_view generic
+        INNER JOIN ir_ui_view generic_parent ON generic_parent.id = generic.inherit_id
+        INNER JOIN ir_ui_view spec_parent ON spec_parent.key = generic_parent.key
+         LEFT JOIN ir_ui_view specific ON specific.key = generic.key AND specific.website_id = spec_parent.website_id
+             WHERE generic.type='qweb'
+               AND generic.website_id IS NULL
+               AND generic.key ~ %s
+               AND spec_parent.website_id IS NOT NULL
+               AND specific.id IS NULL
+          GROUP BY generic.id
+        """
+        self.env.cr.execute(query, (regex, ))
+        result = dict(self.env.cr.fetchall())
+
+        for record in self.browse(result.keys()):
+            specific_parent_view_ids, website_ids = result[record.id]
+            for specific_parent_view_id, website_id in pycompat.izip(specific_parent_view_ids, website_ids):
+                record.with_context(website_id=website_id).write({
+                    'inherit_id': specific_parent_view_id,
+                })
+        super(View, self)._create_all_specific_views(processed_modules)
 
     @api.multi
     def unlink(self):
@@ -109,7 +153,12 @@ class View(models.Model):
                     # care of creating pages and menus.
                     view.with_context(website_id=website.id).write({'name': view.name})
 
-        result = super(View, self).unlink()
+        specific_views = self.env['ir.ui.view']
+        if self and self.pool._init:
+            for view in self.filtered(lambda view: not view.website_id):
+                specific_views += view._get_specific_views()
+
+        result = super(View, self + specific_views).unlink()
         self.clear_caches()
         return result
 
@@ -118,6 +167,7 @@ class View(models.Model):
             # create new pages for this view
             page.copy({
                 'view_id': new_view.id,
+                'is_published': page.is_published,
             })
 
     @api.model
@@ -144,8 +194,12 @@ class View(models.Model):
             return self.filtered(lambda view: not view.website_id)
 
         for view in self:
+            # specific view: add it if it's for the current website and ignore
+            # it if it's for another website
             if view.website_id and view.website_id.id == current_website_id:
                 most_specific_views |= view
+            # generic view: add it only if, for the current website, there is no
+            # specific view for this view (based on the same `key` attribute)
             elif not view.website_id and not any(view.key == view2.key and view2.website_id and view2.website_id.id == current_website_id for view2 in self):
                 most_specific_views |= view
 
@@ -192,7 +246,16 @@ class View(models.Model):
         if not self._context.get('website_id'):
             return super(View, self).get_inheriting_views_arch(view_id, model)
 
-        inheriting_views = super(View, self.with_context(active_test=False)).get_inheriting_views_arch(view_id, model)
+        get_inheriting_self = self.with_context(active_test=False)
+        if self.pool._init and not self._context.get('load_all_views'):
+            view = self.browse(view_id)
+            if view.website_id:
+                original_view = view._get_original_view()
+                original_keys = self.with_context(website_id=False)._get_inheriting_views(original_view.id, model).mapped('key')
+                specific_views = self.search([('key', 'in', original_keys), ('website_id', '=', self._context.get('website_id'))])
+                check_view_ids = list(self._context.get('check_view_ids') or ()) + specific_views.ids
+                get_inheriting_self = self.with_context(check_view_ids=check_view_ids)
+        inheriting_views = super(View, get_inheriting_self).get_inheriting_views_arch(view_id, model)
 
         # prefer inactive website-specific views over active generic ones
         inheriting_views = self.browse([view[1] for view in inheriting_views]).filter_duplicate().filtered('active')
@@ -202,6 +265,17 @@ class View(models.Model):
     @api.model
     @tools.ormcache_context('self._uid', 'xml_id', keys=('website_id',))
     def get_view_id(self, xml_id):
+        """If a website_id is in the context and the given xml_id is not an int
+        then try to get the id of the specific view for that website, but
+        fallback to the id of the generic view if there is no specific.
+
+        If no website_id is in the context, it might randomly return the generic
+        or the specific view, so it's probably not recommanded to use this
+        method. `viewref` is probably more suitable.
+
+        Archived views are ignored (unless the active_test context is set, but
+        then the ormcache_context will not work as expected).
+        """
         if 'website_id' in self._context and not isinstance(xml_id, pycompat.integer_types):
             current_website = self.env['website'].browse(self._context.get('website_id'))
             domain = ['&', ('key', '=', xml_id)] + current_website.website_domain()
@@ -212,6 +286,16 @@ class View(models.Model):
                 raise ValueError('View %r in website %r not found' % (xml_id, self._context['website_id']))
             return view.id
         return super(View, self).get_view_id(xml_id)
+
+    @api.multi
+    def _get_original_view(self):
+        """Given a view, retrieve the original view it was COW'd from.
+        The given view might already be the original one. In that case it will
+        (and should) return itself.
+        """
+        self.ensure_one()
+        domain = [('key', '=', self.key), ('model_data_id', '!=', None)]
+        return self.with_context(active_test=False).search(domain, limit=1)  # Useless limit has multiple xmlid should not be possible
 
     @api.multi
     def render(self, values=None, engine='ir.qweb', minimal_qcontext=False):
@@ -254,18 +338,19 @@ class View(models.Model):
                 qcontext['main_object'] = self
 
             cur = Website.get_current_website()
-            qcontext['multi_website_websites_current'] = {'website_id': cur.id, 'name': cur.name, 'domain': cur.domain}
-            qcontext['multi_website_websites'] = [
-                {'website_id': website.id, 'name': website.name, 'domain': website.domain}
-                for website in Website.search([]) if website != cur
-            ]
+            if self.env.user.has_group('website.group_website_publisher') and self.env.user.has_group('website.group_multi_website'):
+                qcontext['multi_website_websites_current'] = {'website_id': cur.id, 'name': cur.name, 'domain': cur._get_http_domain()}
+                qcontext['multi_website_websites'] = [
+                    {'website_id': website.id, 'name': website.name, 'domain': website._get_http_domain()}
+                    for website in Website.search([]) if website != cur
+                ]
 
-            cur_company = self.env.user.company_id
-            qcontext['multi_website_companies_current'] = {'company_id': cur_company.id, 'name': cur_company.name}
-            qcontext['multi_website_companies'] = [
-                {'company_id': comp.id, 'name': comp.name}
-                for comp in self.env.user.company_ids if comp != cur_company
-            ]
+                cur_company = self.env.user.company_id
+                qcontext['multi_website_companies_current'] = {'company_id': cur_company.id, 'name': cur_company.name}
+                qcontext['multi_website_companies'] = [
+                    {'company_id': comp.id, 'name': comp.name}
+                    for comp in self.env.user.company_ids if comp != cur_company
+                ]
 
             qcontext.update(dict(
                 self._context.copy(),
@@ -306,6 +391,15 @@ class View(models.Model):
         res = super(View, self)._save_oe_structure_hook()
         res['website_id'] = self.env['website'].get_current_website().id
         return res
+
+    @api.model
+    def _set_noupdate(self):
+        '''If website is installed, any call to `save` from the frontend will
+        actually write on the specific view (or create it if not exist yet).
+        In that case, we don't want to flag the generic view as noupdate.
+        '''
+        if not self._context.get('website_id'):
+            super(View, self)._set_noupdate()
 
     @api.multi
     def save(self, value, xpath=None):

@@ -122,6 +122,27 @@ QUnit.module('Views', {
         graph.destroy();
     });
 
+    QUnit.test('field id not in groupBy', function (assert) {
+        assert.expect(1);
+
+        var graph = createView({
+            View: GraphView,
+            model: "foo",
+            data: this.data,
+            arch: '<graph string="Partners">' +
+                        '<field name="id"/>' +
+                '</graph>',
+            mockRPC: function (route, args) {
+                if (args.method === 'read_group') {
+                    assert.deepEqual(args.kwargs.groupby, [],
+                        'groupby should not contain id field');
+                }
+                return this._super.apply(this, arguments);
+            }
+        });
+        graph.destroy();
+    });
+
     QUnit.test('switching mode', function (assert) {
         assert.expect(6);
 
@@ -185,7 +206,7 @@ QUnit.module('Views', {
             "should contain a text element with product xphone on X axis");
         assert.strictEqual(graph.$('.nv-x text:contains(xpad)').length, 1,
             "should contain a text element with product xpad on X axis");
-        assert.strictEqual(graph.$('text:contains(true)').length, 1,
+        assert.strictEqual(graph.$('text:contains("True")').length, 1,
             "should have an entry for each value of field 'bar' in the legend");
 
         graph.destroy();

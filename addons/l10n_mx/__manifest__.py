@@ -36,6 +36,8 @@ With this module you will have:
     "data": [
         "data/account_tag_data.xml",
         "data/l10n_mx_chart_data.xml",
+        "data/account.account.template.csv",
+        "data/l10n_mx_chart_post_data.xml",
         "data/account_data.xml",
         "data/account_tax_data.xml",
         "data/fiscal_position_data.xml",
@@ -43,4 +45,5 @@ With this module you will have:
         "views/res_config_settings_views.xml",
         "views/account_views.xml",
     ],
+    'license': 'LGPL-3',
 }

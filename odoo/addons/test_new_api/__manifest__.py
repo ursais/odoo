@@ -10,7 +10,10 @@
     'data': [
         'ir.model.access.csv',
         'views.xml',
-        'demo_data.xml',
         'template.xml',
     ],
+    'demo': [
+        'demo_data.xml',
+    ],
+    'license': 'LGPL-3',
 }

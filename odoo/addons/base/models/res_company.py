@@ -124,7 +124,8 @@ class Company(models.Model):
 
     @api.onchange('state_id')
     def _onchange_state(self):
-        self.country_id = self.state_id.country_id
+        if self.state_id.country_id:
+            self.country_id = self.state_id.country_id
 
     @api.multi
     def on_change_country(self, country_id):
@@ -211,6 +212,7 @@ class Company(models.Model):
             'phone': vals.get('phone'),
             'website': vals.get('website'),
             'vat': vals.get('vat'),
+            'country_id': vals.get('country_id'),
         })
         vals['partner_id'] = partner.id
         self.clear_caches()
@@ -296,3 +298,12 @@ class Company(models.Model):
     def action_save_onboarding_company_step(self):
         if bool(self.street):
             self.set_onboarding_step_done('base_onboarding_company_state')
+
+    @api.model
+    def _get_main_company(self):
+        try:
+            main_company = self.sudo().env.ref('base.main_company')
+        except ValueError:
+            main_company = self.env['res.company'].sudo().search([], limit=1, order="id")
+
+        return main_company

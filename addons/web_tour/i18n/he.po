@@ -6,13 +6,16 @@
 # ExcaliberX <excaliberx@gmail.com>, 2018
 # Yihya Hugirat <hugirat@gmail.com>, 2018
 # שהאב חוסיין <shhab89@gmail.com>, 2018
+# דודי מלכה <Dudimalka6@gmail.com>, 2019
+# ZVI BLONDER <ZVIBLONDER@gmail.com>, 2020
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: Odoo Server saas~11.5\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2018-09-21 13:18+0000\n"
-"PO-Revision-Date: 2018-09-21 13:18+0000\n"
-"Last-Translator: שהאב חוסיין <shhab89@gmail.com>, 2018\n"
+"PO-Revision-Date: 2018-08-24 09:33+0000\n"
+"Last-Translator: ZVI BLONDER <ZVIBLONDER@gmail.com>, 2020\n"
 "Language-Team: Hebrew (https://www.transifex.com/odoo/teams/41243/he/)\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -25,7 +28,7 @@ msgstr ""
 #: code:addons/web_tour/static/src/js/tour_manager.js:386
 #, python-format
 msgid "Click on the <i>Home icon</i> to navigate across apps."
-msgstr ""
+msgstr "לחץ על <i>סמל הבית</i> כדי לנווט בין יישומים."
 
 #. module: web_tour
 #: model:ir.model.fields,field_description:web_tour.field_web_tour_tour__user_id
@@ -37,7 +40,7 @@ msgstr "נצרך על ידי"
 #: code:addons/web_tour/static/src/xml/debug_manager.xml:7
 #, python-format
 msgid "Disable Tours"
-msgstr ""
+msgstr "השבת סיורים"
 
 #. module: web_tour
 #: model:ir.model.fields,field_description:web_tour.field_web_tour_tour__display_name
@@ -47,7 +50,7 @@ msgstr "השם המוצג"
 #. module: web_tour
 #: model:ir.model,name:web_tour.model_ir_http
 msgid "HTTP Routing"
-msgstr ""
+msgstr "ניתוב HTTP"
 
 #. module: web_tour
 #: model:ir.model.fields,field_description:web_tour.field_web_tour_tour__id
@@ -90,7 +93,7 @@ msgstr "דלג על הסיור"
 #: code:addons/web_tour/static/src/xml/debug_manager.xml:8
 #, python-format
 msgid "Start Tour"
-msgstr ""
+msgstr "התחל סיור"
 
 #. module: web_tour
 #: model_terms:ir.ui.view,arch_db:web_tour.edit_tour_search
@@ -102,7 +105,7 @@ msgstr "טיפ"
 #: code:addons/web_tour/static/src/xml/debug_manager.xml:25
 #, python-format
 msgid "Tour"
-msgstr ""
+msgstr "סיור"
 
 #. module: web_tour
 #: model:ir.model.fields,field_description:web_tour.field_web_tour_tour__name

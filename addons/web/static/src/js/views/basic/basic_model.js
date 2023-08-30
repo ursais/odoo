@@ -144,6 +144,8 @@ var BasicModel = AbstractModel.extend({
         'ir.filters',
         'ir.ui.view',
     ],
+    // FORWARDPORT THIS UP TO 12.2, NOT FURTHER
+    disableBatchedRPCs: false, // to be overriden in tests
 
     /**
      * @override
@@ -153,6 +155,11 @@ var BasicModel = AbstractModel.extend({
         // sequentially, for example, an onchange needs to be completed before a
         // save is performed.
         this.mutex = new concurrency.Mutex();
+
+        // FORWARDPORT THIS UP TO 12.2, NOT FURTHER
+        // this array is used to accumulate RPC requests done in the same call
+        // stack, so that they can be batched in the minimum number of RPCs
+        this.batchedRPCsRequests = [];
 
         this.localData = Object.create(null);
         this._super.apply(this, arguments);
@@ -441,6 +448,11 @@ var BasicModel = AbstractModel.extend({
                     if (parent && parent.type === 'list') {
                         parent.data = _.without(parent.data, record.id);
                         delete self.localData[record.id];
+                        // Check if we are on last page and all records are deleted from current
+                        // page i.e. if there is no state.data.length then go to previous page
+                        if (!parent.data.length && parent.offset > 0) {
+                            parent.offset = Math.max(parent.offset - parent.limit, 0);
+                        }
                     } else {
                         record.res_ids.splice(record.offset, 1);
                         record.offset = Math.min(record.offset, record.res_ids.length - 1);
@@ -467,6 +479,7 @@ var BasicModel = AbstractModel.extend({
         var isNew = this.isNew(id);
         var rollback = 'rollback' in options ? options.rollback : isNew;
         var initialOffset = element.offset;
+        element._domains = {};
         this._visitChildren(element, function (elem) {
             if (rollback && elem._savePoint) {
                 if (elem._savePoint instanceof Array) {
@@ -849,6 +862,7 @@ var BasicModel = AbstractModel.extend({
         });
         _.each(fields, function (field) {
             var dataPoint;
+            record.data[field.name] = null;
             if (field.type === 'many2one') {
                 if (field.value) {
                     var id = _.isArray(field.value) ? field.value[0] : field.value;
@@ -1281,6 +1295,15 @@ var BasicModel = AbstractModel.extend({
                 // optionally clear the DataManager's cache
                 self._invalidateCache(parent);
                 return self.reload(parentID);
+            }).then(function (datapoint) {
+                // if there are no records to display and we are not on first page(we check it
+                // by checking offset is greater than limit i.e. we are not on first page)
+                // reason for adding logic after reload to make sure there is no records after operation
+                if (parent && parent.type === 'list' && !parent.data.length && parent.offset > 0) {
+                    parent.offset = Math.max(parent.offset - parent.limit, 0);
+                    return self.reload(parentID);
+                }
+                return datapoint;
             });
     },
     /**
@@ -1419,6 +1442,8 @@ var BasicModel = AbstractModel.extend({
      * @param {boolean} [options.doNotSetDirty=false] if this flag is set to
      *   true, then we will not tag the record as dirty.  This should be avoided
      *   for most situations.
+     * @param {boolean} [options.forceFail=false] if this flag is set to true, then
+     *   promise will fail when onchange fails (added as local patch only in stable)
      * @param {boolean} [options.notifyChange=true] if this flag is set to
      *   false, then we will not notify and not trigger the onchange, even though
      *   it was changed.
@@ -1447,9 +1472,9 @@ var BasicModel = AbstractModel.extend({
         // apply changes to local data
         for (var fieldName in changes) {
             field = record.fields[fieldName];
-            if (field.type === 'one2many' || field.type === 'many2many') {
+            if (field && (field.type === 'one2many' || field.type === 'many2many')) {
                 defs.push(this._applyX2ManyChange(record, fieldName, changes[fieldName], options.viewType, options.allowWarning));
-            } else if (field.type === 'many2one' || field.type === 'reference') {
+            } else if (field && (field.type === 'many2one' || field.type === 'reference')) {
                 defs.push(this._applyX2OneChange(record, fieldName, changes[fieldName]));
             } else {
                 record._changes[fieldName] = changes[fieldName];
@@ -1464,7 +1489,7 @@ var BasicModel = AbstractModel.extend({
             var onChangeFields = []; // the fields that have changed and that have an on_change
             for (var fieldName in changes) {
                 field = record.fields[fieldName];
-                if (field.onChange) {
+                if (field && field.onChange) {
                     var isX2Many = field.type === 'one2many' || field.type === 'many2many';
                     if (!isX2Many || (self._isX2ManyValid(record._changes[fieldName] || record.data[fieldName]))) {
                         onChangeFields.push(fieldName);
@@ -1481,7 +1506,12 @@ var BasicModel = AbstractModel.extend({
                         self._visitChildren(record, function (elem) {
                             _.extend(elem, initialData[elem.id]);
                         });
-                        onchangeDef.resolve({});
+                        // safe fix for stable version, for opw-2267444
+                        if (!options.force_fail) {
+                            onchangeDef.resolve({});
+                        } else {
+                            onchangeDef.reject({});
+                        }
                     });
             } else {
                 onchangeDef = $.Deferred().resolve(_.keys(changes));
@@ -1862,7 +1892,7 @@ var BasicModel = AbstractModel.extend({
                         model: list.model,
                         method: 'read',
                         args: [_.pluck(data, 'id'), fieldNames],
-                        context: record.context,
+                        context: _.extend({}, record.context, field.context),
                     }).then(function (records) {
                         _.each(records, function (record) {
                             list_records[record.id].data = record;
@@ -2399,7 +2429,7 @@ var BasicModel = AbstractModel.extend({
             if (field.type === 'many2one' && !record.fieldsInfo[record.viewType][name].__no_fetch) {
                 var localId = (record._changes && record._changes[name]) || record.data[name];
                 var relatedRecord = self.localData[localId];
-                if (!relatedRecord) {
+                if (!relatedRecord || relatedRecord.data.display_name) {
                     return;
                 }
                 toBeFetched.push({
@@ -2724,7 +2754,7 @@ var BasicModel = AbstractModel.extend({
                 var ids = record.data[fieldName] || [];
                 var list = self._makeDataPoint({
                     count: ids.length,
-                    context: record.context,
+                    context: _.extend({}, record.context, field.context),
                     fieldsInfo: fieldsInfo,
                     fields: view ? view.fields : fieldInfo.relatedFields,
                     limit: fieldInfo.limit,
@@ -3491,6 +3521,7 @@ var BasicModel = AbstractModel.extend({
         var res_id, value;
         var res_ids = params.res_ids || [];
         var data = params.data || (type === 'record' ? {} : []);
+        var context = params.context;
         if (type === 'record') {
             res_id = params.res_id || (params.data && params.data.id);
             if (res_id) {
@@ -3498,6 +3529,9 @@ var BasicModel = AbstractModel.extend({
             } else {
                 res_id = _.uniqueId('virtual_');
             }
+            // it doesn't make sense for a record datapoint to have those keys
+            // besides, it will mess up x2m and actions down the line
+            context = _.omit(context, ['orderedBy', 'group_by']);
         } else {
             var isValueArray = params.value instanceof Array;
             res_id = isValueArray ? params.value[0] : undefined;
@@ -3515,7 +3549,7 @@ var BasicModel = AbstractModel.extend({
             _domains: {},
             _rawChanges: {},
             aggregateValues: params.aggregateValues || {},
-            context: params.context,
+            context: context,
             count: params.count || res_ids.length,
             data: data,
             domain: params.domain || [],
@@ -3838,8 +3872,12 @@ var BasicModel = AbstractModel.extend({
         var fields = view ? view.fields : fieldInfo.relatedFields;
         var viewType = view ? view.type : fieldInfo.viewType;
 
+        // remove default_* keys from parent context to avoid issue of same field name in x2m
+        var parentContext = _.omit(record.context, function (val, key) {
+            return _.str.startsWith(key, 'default_');
+        });
         var x2manyList = self._makeDataPoint({
-            context: record.context,
+            context: parentContext,
             fieldsInfo: fieldsInfo,
             fields: fields,
             limit: fieldInfo.limit,
@@ -3942,6 +3980,93 @@ var BasicModel = AbstractModel.extend({
 
         return $.when.apply($, defs);
     },
+    // FORWARDPORT THIS UP TO 12.2, NOT FURTHER
+    /**
+     * Empty the pool of accumulated RPC requests: regroup similar requests in
+     * batches and perform an RPC for each batch.
+     *
+     * @private
+     */
+    _performBatchedRPCs: function () {
+        if (!this.batchedRPCsRequests.length) {
+            // pool has already been processed
+            return;
+        }
+
+        // reset pool of RPC requests
+        var batchedRPCsRequests = this.batchedRPCsRequests;
+        this.batchedRPCsRequests = [];
+
+        // batch similar requests
+        var batches = {};
+        var key;
+        for (var i = 0; i < batchedRPCsRequests.length; i++) {
+            var request = batchedRPCsRequests[i];
+            key = request.model + ',' + JSON.stringify(request.context);
+            if (!batches[key]) {
+                batches[key] = _.extend({}, request, {requests: [request]});
+            } else {
+                batches[key].ids = _.uniq(batches[key].ids.concat(request.ids));
+                batches[key].fieldNames = _.uniq(batches[key].fieldNames.concat(request.fieldNames));
+                batches[key].requests.push(request);
+            }
+        }
+
+        // perform batched RPCs
+        function onSuccess(batch, results) {
+            for (var i = 0; i < batch.requests.length; i++) {
+                var request = batch.requests[i];
+                var fieldNames = request.fieldNames.concat(['id']);
+                var filteredResults = results.filter(function (record) {
+                    return request.ids.indexOf(record.id) >= 0;
+                }).map(function (record) {
+                    return _.pick(record, fieldNames);
+                });
+                request.def.resolve(filteredResults);
+            }
+        }
+        function onFailure(batch, error) {
+            for (var i = 0; i < batch.requests.length; i++) {
+                var request = batch.requests[i];
+                request.def.reject(error);
+            }
+        }
+        for (key in batches) {
+            var batch = batches[key];
+            this._rpc({
+                model: batch.model,
+                method: 'read',
+                args: [batch.ids, batch.fieldNames],
+                context: batch.context,
+            }).then(onSuccess.bind(null, batch)).fail(onFailure.bind(null, batch));
+        }
+    },
+    /**
+     * This function accumulates RPC requests done in the same call stack, and
+     * performs them in the next micro task tick so that similar requests can be
+     * batched in a single RPC.
+     *
+     * For now, only 'read' calls are supported.
+     *
+     * @private
+     * @param {Object} params
+     * @returns {Promise}
+     */
+    _performRPC: function (params) {
+        // save the RPC request
+        var def = $.Deferred();
+        var request = _.extend({}, params, {def: def});
+        this.batchedRPCsRequests.push(request);
+
+        if (this.disableBatchedRPCs) {
+            this._performBatchedRPCs();
+        } else {
+            // empty the pool of RPC requests in the next tick
+            setTimeout(this._performBatchedRPCs.bind(this));
+        }
+
+        return def;
+    },
     /**
      * Reads data from server for all missing fields.
      *
@@ -3971,11 +4096,13 @@ var BasicModel = AbstractModel.extend({
 
         var def;
         if (missingIDs.length && fieldNames.length) {
-            def = self._rpc({
-                model: list.model,
-                method: 'read',
-                args: [missingIDs, fieldNames],
+            // FORWARDPORT THIS UP TO 12.2, NOT FURTHER
+            def = self._performRPC({
                 context: list.getContext(),
+                fieldNames: fieldNames,
+                ids: missingIDs,
+                method: 'read',
+                model: list.model,
             });
         } else {
             def = $.when(_.map(missingIDs, function (id) {
@@ -4172,11 +4299,24 @@ var BasicModel = AbstractModel.extend({
         }
         return def.then(function () {
             var resIDs = [];
-            // generate the current count and res_ids list by applying the changes
-            var currentCount = list.count;
             var currentResIDs = list.res_ids;
-            var effectiveLimit = (list.limit || 0) - (list.tempLimitIncrement || 0);
-            var upperBound = effectiveLimit ? Math.min(list.offset + effectiveLimit, currentCount) : currentCount;
+            // if new records have been added to the list, their virtual ids have
+            // been pushed at the end of res_ids (or at the beginning, depending
+            // on the editable property), ignoring completely the current page
+            // where the records have actually been created ; for that reason,
+            // we use orderedResIDs which is a freezed order with the virtual ids
+            // at the correct position where they were actually inserted ; however,
+            // when we use orderedResIDs, we must filter out ids that are not in
+            // res_ids, which correspond to records that have been removed from
+            // the relation (this information being taken into account in res_ids
+            // but not in orderedResIDs)
+            if (list.orderedResIDs) {
+                currentResIDs = list.orderedResIDs.filter(function (resID) {
+                    return list.res_ids.indexOf(resID) >= 0;
+                });
+            }
+            var currentCount = currentResIDs.length;
+            var upperBound = list.limit ? Math.min(list.offset + list.limit, currentCount) : currentCount;
             var fieldNames = list.getFieldNames();
             for (var i = list.offset; i < upperBound; i++) {
                 var resId = currentResIDs[i];
@@ -4216,6 +4356,7 @@ var BasicModel = AbstractModel.extend({
                     fieldsInfo: element.fieldsInfo,
                     fields: element.fields,
                     viewType: element.viewType,
+                    allowWarning: true,
                 };
                 return this._makeDefaultRecord(element.model, params);
             }
