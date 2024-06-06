@@ -10,6 +10,7 @@ from odoo import api, fields, models, _, SUPERUSER_ID
 from odoo.exceptions import UserError, ValidationError
 from odoo.tools import float_compare, float_round, format_datetime
 
+import time
 
 class MrpWorkorder(models.Model):
     _name = 'mrp.workorder'
@@ -160,6 +161,10 @@ class MrpWorkorder(models.Model):
         # Force to compute the production_availability right away.
         # It is a trick to force that the state of workorder is computed at the end of the
         # cyclic depends with the mo.state, mo.reservation_state and wo.state and avoid recursion error
+        
+        # added delay to refresh data. 
+        time.sleep(0.1)
+        
         self.mapped('production_availability')
         for workorder in self:
             if workorder.state == 'pending':
