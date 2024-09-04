@@ -140,8 +140,8 @@ FROM (SELECT
         'forecast' as state,
         GENERATE_SERIES(
         CASE
-            WHEN m.state = 'done' THEN (now() at time zone 'utc')::date - interval '3month'
-            ELSE m.date::date
+            WHEN m.state = 'done' THEN (now() at time zone 'utc')::date - interval '%(report_period)s month'
+            ELSE GREATEST(m.date::date, (now() at time zone 'utc')::date - interval '%(report_period)s month')
         END,
         CASE
             WHEN m.state != 'done' THEN (now() at time zone 'utc')::date + interval '3 month'
