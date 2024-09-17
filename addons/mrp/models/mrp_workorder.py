@@ -12,6 +12,9 @@ from odoo.tools import float_compare, float_round, format_datetime
 
 import time
 
+import logging
+_logger = logging.getLogger(__name__)
+
 class MrpWorkorder(models.Model):
     _name = 'mrp.workorder'
     _description = 'Work Order'
@@ -164,6 +167,7 @@ class MrpWorkorder(models.Model):
         
         # added delay to refresh data. 
         time.sleep(0.1)
+        _logger.error('**************Computing State on WorkOrder********:  %s', self.name)
         
         self.mapped('production_availability')
         for workorder in self:
@@ -180,6 +184,7 @@ class MrpWorkorder(models.Model):
                 continue
             if workorder.production_availability == 'assigned' and workorder.state == 'waiting':
                 workorder.state = 'ready'
+                _logger.error('----------------------Setting WorkOrder to Ready State-------------------:  %s', workorder.name)
             elif workorder.production_availability != 'assigned' and workorder.state == 'ready':
                 workorder.state = 'waiting'
 
@@ -327,10 +332,14 @@ class MrpWorkorder(models.Model):
             rounding = order.production_id.product_uom_id.rounding
             order.is_produced = float_compare(order.qty_produced, order.production_id.product_qty, precision_rounding=rounding) >= 0
 
-    @api.depends('operation_id', 'workcenter_id', 'qty_production')
+    @api.depends('operation_id', 'workcenter_id', 'qty_producing', 'qty_production')
     def _compute_duration_expected(self):
         for workorder in self:
-            workorder.duration_expected = workorder._get_duration_expected()
+            # Recompute the duration expected if the qty_producing has been changed:
+            # compare with the origin record if it happens during an onchange
+            if workorder.state not in ['done', 'cancel'] and (workorder.qty_producing != workorder.qty_production
+                or (workorder._origin != workorder and workorder._origin.qty_producing and workorder.qty_producing != workorder._origin.qty_producing)):
+                workorder.duration_expected = workorder._get_duration_expected()
 
     @api.depends('time_ids.duration', 'qty_produced')
     def _compute_duration(self):
@@ -772,7 +781,7 @@ class MrpWorkorder(models.Model):
             if duration_expected_working < 0:
                 duration_expected_working = 0
             return self.workcenter_id._get_expected_duration(self.product_id) + duration_expected_working * ratio * 100.0 / self.workcenter_id.time_efficiency
-        qty_production = self.production_id.product_uom_id._compute_quantity(self.qty_production, self.production_id.product_id.uom_id)
+        qty_production = self.production_id.product_uom_id._compute_quantity(self.qty_producing or self.qty_production, self.production_id.product_id.uom_id)
         capacity = self.workcenter_id._get_capacity(self.product_id)
         cycle_number = float_round(qty_production / capacity, precision_digits=0, rounding_method='UP')
         if alternative_workcenter:
