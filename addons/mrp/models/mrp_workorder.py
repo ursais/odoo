@@ -12,6 +12,9 @@ from odoo.tools import float_compare, float_round, format_datetime
 
 import time
 
+import logging
+_logger = logging.getLogger(__name__)
+
 class MrpWorkorder(models.Model):
     _name = 'mrp.workorder'
     _description = 'Work Order'
@@ -164,6 +167,7 @@ class MrpWorkorder(models.Model):
         
         # added delay to refresh data. 
         time.sleep(0.1)
+        _logger.error('**************Computing State on WorkOrder********:  %s', self.name)
         
         self.mapped('production_availability')
         for workorder in self:
@@ -180,6 +184,7 @@ class MrpWorkorder(models.Model):
                 continue
             if workorder.production_availability == 'assigned' and workorder.state == 'waiting':
                 workorder.state = 'ready'
+                _logger.error('----------------------Setting WorkOrder to Ready State-------------------:  %s', workorder.name)
             elif workorder.production_availability != 'assigned' and workorder.state == 'ready':
                 workorder.state = 'waiting'
 
