@@ -165,9 +165,18 @@ class MrpWorkorder(models.Model):
         # It is a trick to force that the state of workorder is computed at the end of the
         # cyclic depends with the mo.state, mo.reservation_state and wo.state and avoid recursion error
         
-        # added delay to refresh data. 
-        time.sleep(0.1)
-        _logger.error('**************Computing State on WorkOrder********:  %s', self.name)
+        # added delay to refresh data. Working and tested value is 0.1
+        #time.sleep(0.1)
+
+        time_delay = (
+            self.env["ir.config_parameter"]
+            .sudo()
+            .get_param("mrp_workorder.time_delay")
+        ) or 0.0
+
+        time.sleep(float(time_delay))
+
+        _logger.info('**************Computing State on WorkOrder********:  %s, Delay: %s', self.name,str(time_delay))
         
         self.mapped('production_availability')
         for workorder in self:
@@ -184,7 +193,7 @@ class MrpWorkorder(models.Model):
                 continue
             if workorder.production_availability == 'assigned' and workorder.state == 'waiting':
                 workorder.state = 'ready'
-                _logger.error('----------------------Setting WorkOrder to Ready State-------------------:  %s', workorder.name)
+                _logger.info('----------------------Setting WorkOrder to Ready State-------------------:  %s', workorder.name)
             elif workorder.production_availability != 'assigned' and workorder.state == 'ready':
                 workorder.state = 'waiting'
 

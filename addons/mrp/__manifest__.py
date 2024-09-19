@@ -4,7 +4,7 @@
 
 {
     'name': 'Manufacturing',
-    'version': '2.3',
+    'version': '2.4',
     'website': 'https://www.odoo.com/app/manufacturing',
     'category': 'Manufacturing/Manufacturing',
     'sequence': 55,
