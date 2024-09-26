@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
 import re
@@ -158,7 +157,7 @@ class HrExpense(models.Model):
                 expense.state = "refused"
             elif expense.sheet_id.state == "approve" or expense.sheet_id.state == "post":
                 expense.state = "approved"
-            elif not expense.sheet_id.account_move_id:
+            elif not expense.sheet_id.account_move_id and expense.sheet_id.state != 'done':
                 expense.state = "reported"
             else:
                 expense.state = "done"
@@ -191,8 +190,8 @@ class HrExpense(models.Model):
             currency=currency or self.currency_id,
             product=self.product_id,
             taxes=self.tax_ids,
-            price_unit=price_unit or self.total_amount_company,
-            quantity=quantity or 1,
+            price_unit=price_unit or 0,
+            quantity=quantity if quantity is not None else 1,  # Allows 0 quantity
             account=self.account_id,
             analytic_distribution=self.analytic_distribution,
             extra_context={'force_price_include': True},
@@ -363,7 +362,7 @@ class HrExpense(models.Model):
     @api.onchange('total_amount')
     def _inverse_total_amount(self):
         for expense in self:
-            expense.unit_amount = expense.total_amount_company / expense.quantity
+            expense.unit_amount = expense.total_amount_company / (expense.quantity or 1)
 
     @api.constrains('payment_mode')
     def _check_payment_mode(self):
@@ -434,6 +433,10 @@ class HrExpense(models.Model):
                 raise UserError(_('You cannot delete a posted or approved expense.'))
 
     def write(self, vals):
+        if 'state' in vals and (not self.user_has_groups('hr_expense.group_hr_expense_manager') and vals['state'] != 'submit' and
+        any(expense.state == 'draft' for expense in self)):
+            raise UserError(_("You don't have the rights to bypass the validation process of this expense."))
+        expense_to_previous_sheet = {}
         if 'sheet_id' in vals:
             self.env['hr.expense.sheet'].browse(vals['sheet_id']).check_access_rule('write')
         if 'tax_ids' in vals or 'analytic_distribution' in vals or 'account_id' in vals:
@@ -957,7 +960,16 @@ class HrExpenseSheet(models.Model):
     @api.depends('account_move_id.payment_state')
     def _compute_payment_state(self):
         for sheet in self:
-            sheet.payment_state = sheet.account_move_id.payment_state or 'not_paid'
+            sheet_move = sheet.account_move_id
+            if not sheet_move:
+                sheet.payment_state = 'not_paid'
+            elif sheet_move.currency_id.compare_amounts(
+                sum(sheet_move.reversal_move_id.mapped('amount_total')),
+                sheet_move.amount_total
+            ) == 0:
+                sheet.payment_state = 'reversed'
+            else:
+                sheet.payment_state = sheet_move.payment_state
 
     def _compute_attachment_number(self):
         for sheet in self:
@@ -1058,6 +1070,17 @@ class HrExpenseSheet(models.Model):
         sheets.activity_update()
         return sheets
 
+    def write(self, vals):
+        if 'state' in vals:
+            # Avoid user with write access on expense sheet in draft state to bypass the validation process
+            if not self.user_has_groups('hr_expense.group_hr_expense_manager') and self.state == 'draft' and vals['state'] != 'submit':
+                raise UserError(_("You don't have the rights to bypass the validation process of this expense report."))
+            elif vals['state'] == 'approve':
+                self._check_can_approve()
+            elif vals['state'] == 'cancel':
+                self._check_can_refuse()
+        return super().write(vals)
+
     @api.ondelete(at_uninstall=False)
     def _unlink_except_posted_or_paid(self):
         for expense in self:
@@ -1142,9 +1165,8 @@ class HrExpenseSheet(models.Model):
 
         moves = self.env['account.move'].create([sheet._prepare_bill_vals() for sheet in own_account_sheets])
         payments = self.env['account.payment'].with_context(**skip_context).create([sheet._prepare_payment_vals() for sheet in company_account_sheets])
-        (moves + payments.move_id).flush_recordset()  # Else moves may be improperly set when posted, causing posting to fail
+        moves |= payments.move_id
         moves.action_post()
-        payments.move_id.with_context(**skip_context).action_post()
 
         self.activity_update()
 
@@ -1169,53 +1191,46 @@ class HrExpenseSheet(models.Model):
         else:
             currency = self.expense_line_ids[0].currency_id
             amount = sum(self.expense_line_ids.mapped('total_amount'))
-        rate = amount / self.total_amount if self.total_amount else 0.0
         move_lines = []
         for expense in self.expense_line_ids:
-            # Due to rounding and conversion mismatch between vendor bills and payments, we have to force the computation into company account
-            amount_currency_diff = expense.total_amount_company if currency == expense.company_currency_id else expense.total_amount
-            last_expense_line = None # Used for rounding in currency issues
-            tax_data = self.env['account.tax']._compute_taxes([expense._convert_to_tax_base_line_dict()])
-            for base_line_data, update in tax_data['base_lines_to_update']:  # Add base lines
-                base_line_data.update(update)
-                amount_currency = currency.round(base_line_data['price_subtotal'] * rate)
-                expense_name = expense.name.split("\n")[0][:64]
-                last_expense_line = base_move_line = {
-                    'name': f'{expense.employee_id.name}: {expense_name}',
-                    'account_id':base_line_data['account'].id,
-                    'product_id': base_line_data['product'].id,
-                    'analytic_distribution': base_line_data['analytic_distribution'],
-                    'expense_id': expense.id,
-                    'tax_ids': [Command.set(expense.tax_ids.ids)],
-                    'tax_tag_ids': base_line_data['tax_tag_ids'],
-                    'balance': base_line_data['price_subtotal'],
-                    'amount_currency': amount_currency,
-                    'currency_id': currency.id,
-                }
-                amount_currency_diff -= amount_currency
-                move_lines.append(base_move_line)
+            tax_data = self.env['account.tax']._compute_taxes([expense._convert_to_tax_base_line_dict(price_unit=expense.total_amount, currency=expense.currency_id)])
+            rate = abs(expense.total_amount / expense.total_amount_company)
+            base_line_data, to_update = tax_data['base_lines_to_update'][0]  # Add base lines
+            amount_currency = to_update['price_subtotal']
+            expense_name = expense.name.split("\n")[0][:64]
+            base_move_line = {
+                'name': f'{expense.employee_id.name}: {expense_name}',
+                'account_id': base_line_data['account'].id,
+                'product_id': base_line_data['product'].id,
+                'analytic_distribution': base_line_data['analytic_distribution'],
+                'expense_id': expense.id,
+                'tax_ids': [Command.set(expense.tax_ids.ids)],
+                'tax_tag_ids': to_update['tax_tag_ids'],
+                'amount_currency': amount_currency,
+                'currency_id': currency.id,
+            }
+            move_lines.append(base_move_line)
+            total_tax_line_balance = 0.0
             for tax_line_data in tax_data['tax_lines_to_add']:  # Add tax lines
-                amount_currency = currency.round(tax_line_data['tax_amount'] * rate)
-                last_expense_line = tax_line = {
+                tax_line_balance = expense.currency_id.round(tax_line_data['tax_amount'] / rate)
+                total_tax_line_balance += tax_line_balance
+                tax_line = {
                     'name': self.env['account.tax'].browse(tax_line_data['tax_id']).name,
-                    'display_type': 'tax',
                     'account_id': tax_line_data['account_id'],
                     'analytic_distribution': tax_line_data['analytic_distribution'],
                     'expense_id': expense.id,
                     'tax_tag_ids': tax_line_data['tax_tag_ids'],
-                    'balance': tax_line_data['tax_amount'],
-                    'amount_currency': amount_currency,
+                    'balance': tax_line_balance,
+                    'amount_currency': tax_line_data['tax_amount'],
+                    'tax_base_amount': expense.currency_id.round(tax_line_data['base_amount'] / rate),
                     'currency_id': currency.id,
                     'tax_repartition_line_id': tax_line_data['tax_repartition_line_id'],
                 }
                 move_lines.append(tax_line)
-                amount_currency_diff -= amount_currency
-            if not currency.is_zero(amount_currency_diff) and last_expense_line:
-                last_expense_line['amount_currency'] += amount_currency_diff
+            base_move_line['balance'] = expense.total_amount_company - total_tax_line_balance
         expense_name = self.name.split("\n")[0][:64]
         move_lines.append({  # Add outstanding payment line
             'name': f'{self.employee_id.name}: {expense_name}',
-            'display_type': 'payment_term',
             'account_id': self.expense_line_ids[0]._get_expense_account_destination(),
             'balance': -self.total_amount,
             'amount_currency': currency.round(-amount),
@@ -1307,6 +1322,8 @@ class HrExpenseSheet(models.Model):
         self.sudo().activity_update()
 
     def _check_can_approve(self):
+        if self.env.su:
+            return
         if not self.user_has_groups('hr_expense.group_hr_expense_team_approver'):
             raise UserError(_("Only Managers and HR Officers can approve expenses"))
         elif not self.user_has_groups('hr_expense.group_hr_expense_manager'):
@@ -1371,9 +1388,12 @@ class HrExpenseSheet(models.Model):
     def paid_expense_sheets(self):
         self.write({'state': 'done'})
 
-    def refuse_sheet(self, reason):
+    # TODO in master could be aggregated with _check_can_accept
+    def _check_can_refuse(self):
+        if self.env.su:
+            return
         if not self.user_has_groups('hr_expense.group_hr_expense_team_approver'):
-            raise UserError(_("Only Managers and HR Officers can approve expenses"))
+            raise UserError(_("Only Managers and HR Officers can refuse expenses"))
         elif not self.user_has_groups('hr_expense.group_hr_expense_manager'):
             current_managers = self.employee_id.expense_manager_id | self.employee_id.parent_id.user_id | self.employee_id.department_id.manager_id.user_id | self.user_id
 
@@ -1383,6 +1403,8 @@ class HrExpenseSheet(models.Model):
             if not self.env.user in current_managers and not self.user_has_groups('hr_expense.group_hr_expense_user') and self.employee_id.expense_manager_id != self.env.user:
                 raise UserError(_("You can only refuse your department expenses"))
 
+    def refuse_sheet(self, reason):
+        self._check_can_refuse()
         self.write({'state': 'cancel'})
         for sheet in self:
             sheet.message_post_with_view('hr_expense.hr_expense_template_refuse_reason', values={'reason': reason, 'is_sheet': True, 'name': sheet.name})
@@ -1391,8 +1413,8 @@ class HrExpenseSheet(models.Model):
     def reset_expense_sheets(self):
         if not self.can_reset:
             raise UserError(_("Only HR Officers or the concerned employee can reset to draft."))
-        self.mapped('expense_line_ids').write({'is_refused': False})
         self.sudo().write({'state': 'draft', 'approval_date': False})
+        self.mapped('expense_line_ids').write({'is_refused': False})
         self.activity_update()
         return True
 
