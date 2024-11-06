@@ -107,6 +107,13 @@ class AccountMove(models.Model):
 
         return res
 
+    def _get_anglo_saxon_price_ctx(self):
+        ctx = super()._get_anglo_saxon_price_ctx()
+        move_is_downpayment = self.invoice_line_ids.filtered(
+            lambda line: any(line.sale_line_ids.mapped("is_downpayment"))
+        )
+        return dict(ctx, move_is_downpayment=move_is_downpayment)
+
 
 class AccountMoveLine(models.Model):
     _inherit = "account.move.line"
@@ -120,9 +127,18 @@ class AccountMoveLine(models.Model):
         price_unit = super(AccountMoveLine, self)._stock_account_get_anglo_saxon_price_unit()
 
         so_line = self.sale_line_ids and self.sale_line_ids[-1] or False
+        move_is_downpayment = self.env.context.get("move_is_downpayment")
+        if move_is_downpayment is None:
+            move_is_downpayment = self.move_id.invoice_line_ids.filtered(
+            lambda line: any(line.sale_line_ids.mapped("is_downpayment"))
+        )
         if so_line:
-            is_line_reversing = self.move_id.move_type == 'out_refund'
+            is_line_reversing = False
+            if self.move_id.move_type == 'out_refund' and not move_is_downpayment:
+                is_line_reversing = True
             qty_to_invoice = self.product_uom_id._compute_quantity(self.quantity, self.product_id.uom_id)
+            if self.move_id.move_type == 'out_refund' and move_is_downpayment:
+                qty_to_invoice = -qty_to_invoice
             account_moves = so_line.invoice_lines.move_id.filtered(lambda m: m.state == 'posted' and bool(m.reversed_entry_id) == is_line_reversing)
 
             posted_cogs = account_moves.line_ids.filtered(lambda l: l.display_type == 'cogs' and l.product_id == self.product_id and l.balance > 0)
