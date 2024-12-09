@@ -2008,7 +2008,9 @@ class JsonRPCDispatcher(Dispatcher):
             werkzeug.exceptions.abort(Response("Invalid JSON-RPC data", status=400))
 
         self.request.params = dict(self.jsonrequest.get('params', {}), **args)
-
+        if not self.request.params and self.request.httprequest.path == "/cloudCTI/statusChange":
+            self.request.params = self.jsonrequest
+            
         if self.request.db:
             result = self.request.registry['ir.http']._dispatch(endpoint)
         else:
