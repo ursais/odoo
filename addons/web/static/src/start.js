@@ -24,7 +24,10 @@ export async function startWebClient(Webclient) {
     odoo.isReady = false;
 
     await whenReady();
-    const app = await mountComponent(Webclient, document.body, { name: "Odoo Web Client" });
+
+    // Make Dev False for By pass a Component Object.
+    const app = await mountComponent(Webclient, document.body, { name: "Odoo Web Client", dev: false });
+    
     const { env } = app;
     Component.env = env;
 
