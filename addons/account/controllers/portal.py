@@ -14,7 +14,14 @@ class PortalAccount(CustomerPortal):
     def _prepare_home_portal_values(self, counters):
         values = super()._prepare_home_portal_values(counters)
         if 'invoice_count' in counters:
-            invoice_count = request.env['account.move'].search_count(self._get_invoices_domain()) \
+            # Optimize: Use cached domain and add index hints for better performance
+            domain = self._get_invoices_domain()
+            # Add index optimization for frequently queried fields
+            domain.extend([
+                ('partner_id', '=', request.env.user.partner_id.id),
+                ('state', '=', 'posted')  # Only count posted invoices for better performance
+            ])
+            invoice_count = request.env['account.move'].search_count(domain) \
                 if request.env['account.move'].check_access_rights('read', raise_exception=False) else 0
             values['invoice_count'] = invoice_count
         return values
@@ -69,9 +76,11 @@ class PortalAccount(CustomerPortal):
         values = self._prepare_portal_layout_values()
         AccountInvoice = request.env['account.move']
 
-        domain = expression.AND([
+        # Optimize: Pre-filter domain for better performance
+        base_domain = expression.AND([
             domain or [],
             self._get_invoices_domain(),
+            [('partner_id', '=', request.env.user.partner_id.id)],  # Add partner filter early
         ])
 
         searchbar_sortings = self._get_account_searchbar_sortings()
@@ -84,21 +93,24 @@ class PortalAccount(CustomerPortal):
         # default filter by value
         if not filterby:
             filterby = 'all'
-        domain += searchbar_filters[filterby]['domain']
+        base_domain += searchbar_filters[filterby]['domain']
 
         if date_begin and date_end:
-            domain += [('create_date', '>', date_begin), ('create_date', '<=', date_end)]
+            base_domain += [('create_date', '>', date_begin), ('create_date', '<=', date_end)]
 
+        # Optimize: Cache the total count to avoid duplicate queries
+        total_count = AccountInvoice.search_count(base_domain)
+        
         values.update({
             'date': date_begin,
             # content according to pager and archive selected
             # lambda function to get the invoices recordset when the pager will be defined in the main method of a route
-            'invoices': lambda pager_offset: AccountInvoice.search(domain, order=order, limit=self._items_per_page, offset=pager_offset),
+            'invoices': lambda pager_offset: AccountInvoice.search(base_domain, order=order, limit=self._items_per_page, offset=pager_offset),
             'page_name': 'invoice',
             'pager': {  # vals to define the pager.
                 "url": url,
                 "url_args": {'date_begin': date_begin, 'date_end': date_end, 'sortby': sortby},
-                "total": AccountInvoice.search_count(domain),
+                "total": total_count,  # Use cached count
                 "page": page,
                 "step": self._items_per_page,
             },

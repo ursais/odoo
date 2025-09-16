@@ -113,38 +113,110 @@ class AccountBankStatement(models.Model):
 
     @api.depends('create_date')
     def _compute_balance_start(self):
+        """Optimized computation of balance start with batched queries."""
+        if not self:
+            return
+            
+        # Optimize: Batch process all statements to reduce database queries
+        statements_by_journal = {}
         for stmt in self.sorted(lambda x: x.first_line_index or '0'):
             journal_id = stmt.journal_id.id or stmt.line_ids.journal_id.id
-            previous_line_with_statement = self.env['account.bank.statement.line'].search([
-                ('internal_index', '<', stmt.first_line_index),
-                ('journal_id', '=', journal_id),
-                ('state', '=', 'posted'),
-                ('statement_id', '!=', False),
-            ], limit=1)
-            balance_start = previous_line_with_statement.statement_id.balance_end_real
-
-            lines_in_between_domain = [
-                ('internal_index', '<', stmt.first_line_index),
-                ('journal_id', '=', journal_id),
-                ('state', '=', 'posted'),
-            ]
-            if previous_line_with_statement:
-                lines_in_between_domain.append(('internal_index', '>', previous_line_with_statement.internal_index))
-                # remove lines from previous statement (when multi-editing a line already in another statement)
-                previous_st_lines = previous_line_with_statement.statement_id.line_ids
-                lines_in_common = previous_st_lines.filtered(lambda l: l.id in stmt.line_ids._origin.ids)
-                balance_start -= sum(lines_in_common.mapped('amount'))
-
-            lines_in_between = self.env['account.bank.statement.line'].search(lines_in_between_domain)
-            balance_start += sum(lines_in_between.mapped('amount'))
-
+            if journal_id not in statements_by_journal:
+                statements_by_journal[journal_id] = []
+            statements_by_journal[journal_id].append(stmt)
+        
+        # Process each journal's statements in batch
+        for journal_id, statements in statements_by_journal.items():
+            self._compute_balance_start_for_journal(journal_id, statements)
+    
+    def _compute_balance_start_for_journal(self, journal_id, statements):
+        """Helper method to compute balance start for all statements of a journal."""
+        if not statements:
+            return
+            
+        # Get all relevant statement lines in one query
+        statement_ids = [stmt.id for stmt in statements]
+        first_line_indexes = [stmt.first_line_index for stmt in statements if stmt.first_line_index]
+        
+        if not first_line_indexes:
+            return
+            
+        # Optimize: Single query to get previous statements and their balances
+        query_string = """
+            SELECT stmt.id as statement_id,
+                   stmt.first_line_index,
+                   stmt.balance_end_real,
+                   COALESCE(prev_stmt.balance_end_real, 0) as prev_balance
+            FROM account_bank_statement stmt
+            LEFT JOIN LATERAL (
+                SELECT balance_end_real
+                FROM account_bank_statement prev_stmt
+                WHERE prev_stmt.journal_id = %s
+                  AND prev_stmt.first_line_index < stmt.first_line_index
+                ORDER BY prev_stmt.first_line_index DESC
+                LIMIT 1
+            ) prev_stmt ON TRUE
+            WHERE stmt.id = ANY(%s)
+        """
+        
+        self._cr.execute(query_string, (journal_id, statement_ids))
+        statement_data = {row[0]: {'first_line_index': row[1], 'balance_end_real': row[2], 'prev_balance': row[3]} 
+                        for row in self._cr.fetchall()}
+        
+        # Compute balance for each statement
+        for stmt in statements:
+            if stmt.id not in statement_data:
+                stmt.balance_start = 0
+                continue
+                
+            data = statement_data[stmt.id]
+            balance_start = data['prev_balance']
+            
+            # Add lines between previous statement and current statement
+            if stmt.first_line_index:
+                lines_query = """
+                    SELECT COALESCE(SUM(amount), 0)
+                    FROM account_bank_statement_line stl
+                    JOIN account_move move ON move.id = stl.move_id
+                    WHERE stl.journal_id = %s
+                      AND move.state = 'posted'
+                      AND stl.internal_index < %s
+                      AND stl.internal_index >= COALESCE(
+                          (SELECT first_line_index FROM account_bank_statement 
+                           WHERE journal_id = %s AND first_line_index < %s
+                           ORDER BY first_line_index DESC LIMIT 1), '')
+                """
+                self._cr.execute(lines_query, (journal_id, stmt.first_line_index, journal_id, stmt.first_line_index))
+                lines_amount = self._cr.fetchone()[0] or 0
+                balance_start += lines_amount
+            
             stmt.balance_start = balance_start
 
     @api.depends('balance_start', 'line_ids.amount', 'line_ids.state')
     def _compute_balance_end(self):
+        """Optimized computation of balance end with batched processing."""
+        if not self:
+            return
+            
+        # Optimize: Batch compute line amounts for all statements
+        statement_ids = [stmt.id for stmt in self]
+        if not statement_ids:
+            return
+            
+        query_string = """
+            SELECT statement_id, COALESCE(SUM(amount), 0) as total_amount
+            FROM account_bank_statement_line
+            WHERE statement_id = ANY(%s)
+              AND state = 'posted'
+            GROUP BY statement_id
+        """
+        
+        self._cr.execute(query_string, (statement_ids,))
+        line_amounts = {row[0]: row[1] for row in self._cr.fetchall()}
+        
         for stmt in self:
-            lines = stmt.line_ids.filtered(lambda x: x.state == 'posted')
-            stmt.balance_end = stmt.balance_start + sum(lines.mapped('amount'))
+            line_amount = line_amounts.get(stmt.id, 0)
+            stmt.balance_end = stmt.balance_start + line_amount
 
     @api.depends('balance_start')
     def _compute_balance_end_real(self):

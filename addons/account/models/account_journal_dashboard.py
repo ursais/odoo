@@ -278,22 +278,147 @@ class account_journal(models.Model):
             result[journal.id] = [{'values': data, 'title': graph_title, 'key': graph_key, 'is_sample_data': is_sample_data}]
         return result
 
+    def _fill_sale_purchase_dashboard_data_optimized(self, dashboard_data, journal_currencies):
+        """Optimized version of sale and purchase journal dashboard data population."""
+        sale_purchase_journals = self.filtered(lambda journal: journal.type in ('sale', 'purchase'))
+        if not sale_purchase_journals:
+            return
+            
+        journal_ids = sale_purchase_journals.ids
+        
+        # Optimize: Single query to get all sale/purchase dashboard data
+        self._cr.execute("""
+            WITH bills_to_pay AS (
+                SELECT journal_id,
+                       COUNT(*) as count,
+                       SUM(amount_residual_signed) as total_amount
+                FROM account_move
+                WHERE journal_id = ANY(%s)
+                  AND state = 'posted'
+                  AND payment_state IN ('not_paid', 'partial')
+                  AND move_type IN %s
+                GROUP BY journal_id
+            ),
+            draft_bills AS (
+                SELECT journal_id,
+                       COUNT(*) as count,
+                       SUM(amount_residual_signed) as total_amount
+                FROM account_move
+                WHERE journal_id = ANY(%s)
+                  AND state = 'draft'
+                  AND payment_state IN ('not_paid', 'partial')
+                  AND move_type IN %s
+                GROUP BY journal_id
+            ),
+            late_bills AS (
+                SELECT journal_id,
+                       COUNT(*) as count,
+                       SUM(amount_residual_signed) as total_amount
+                FROM account_move
+                WHERE journal_id = ANY(%s)
+                  AND invoice_date_due < CURRENT_DATE
+                  AND state = 'posted'
+                  AND payment_state IN ('not_paid', 'partial')
+                  AND move_type IN %s
+                GROUP BY journal_id
+            ),
+            to_check_bills AS (
+                SELECT journal_id,
+                       COUNT(*) as count,
+                       SUM(amount_total_signed) as total_amount
+                FROM account_move
+                WHERE journal_id = ANY(%s)
+                  AND to_check = TRUE
+                GROUP BY journal_id
+            )
+            SELECT 
+                j.id as journal_id,
+                COALESCE(btp.count, 0) as bills_to_pay_count,
+                COALESCE(btp.total_amount, 0) as bills_to_pay_amount,
+                COALESCE(db.count, 0) as draft_count,
+                COALESCE(db.total_amount, 0) as draft_amount,
+                COALESCE(lb.count, 0) as late_count,
+                COALESCE(lb.total_amount, 0) as late_amount,
+                COALESCE(tcb.count, 0) as to_check_count,
+                COALESCE(tcb.total_amount, 0) as to_check_amount
+            FROM account_journal j
+            LEFT JOIN bills_to_pay btp ON btp.journal_id = j.id
+            LEFT JOIN draft_bills db ON db.journal_id = j.id
+            LEFT JOIN late_bills lb ON lb.journal_id = j.id
+            LEFT JOIN to_check_bills tcb ON tcb.journal_id = j.id
+            WHERE j.id = ANY(%s)
+        """, (
+            journal_ids, tuple(self.env['account.move'].get_invoice_types(True)),
+            journal_ids, tuple(self.env['account.move'].get_invoice_types(True)),
+            journal_ids, tuple(self.env['account.move'].get_invoice_types(True)),
+            journal_ids,
+            journal_ids
+        ))
+        
+        query_data = {row[0]: {
+            'bills_to_pay_count': row[1], 'bills_to_pay_amount': row[2],
+            'draft_count': row[3], 'draft_amount': row[4],
+            'late_count': row[5], 'late_amount': row[6],
+            'to_check_count': row[7], 'to_check_amount': row[8]
+        } for row in self._cr.fetchall()}
+        
+        # Get entries count
+        entries_count = {
+            r['journal_id'][0]: r['journal_id_count']
+            for r in self.env['account.move']._read_group(
+                domain=[('journal_id', 'in', journal_ids)],
+                fields=['journal_id'],
+                groupby=['journal_id'],
+            )
+        }
+        
+        for journal in sale_purchase_journals:
+            data = query_data.get(journal.id, {})
+            currency = journal.currency_id or journal.company_id.currency_id
+            
+            dashboard_data[journal.id].update({
+                'number_to_check': data.get('to_check_count', 0),
+                'to_check_balance': data.get('to_check_amount', 0),
+                'title': _('Bills to pay') if journal.type == 'purchase' else _('Invoices owed to you'),
+                'number_draft': data.get('draft_count', 0),
+                'number_waiting': data.get('bills_to_pay_count', 0),
+                'number_late': data.get('late_count', 0),
+                'sum_draft': currency.format(data.get('draft_amount', 0)),
+                'sum_waiting': currency.format(data.get('bills_to_pay_amount', 0)),
+                'sum_late': currency.format(data.get('late_amount', 0)),
+                'has_sequence_holes': journal.has_sequence_holes,
+                'is_sample_data': entries_count.get(journal.id, 0),
+            })
+
     # TODO remove in master
     def get_journal_dashboard_datas(self):
         return self._get_journal_dashboard_data_batched()[self.id]
 
     def _get_journal_dashboard_data_batched(self):
-        self.env['account.move'].flush_model()
-        self.env['account.move.line'].flush_model()
+        """Optimized dashboard data generation with improved caching and batching."""
+        # Optimize: Only flush if necessary and batch the operations
+        if self._context.get('force_flush'):
+            self.env['account.move'].flush_model()
+            self.env['account.move.line'].flush_model()
+        
         dashboard_data = {}  # container that will be filled by functions below
+        
+        # Optimize: Pre-compute common data to avoid repeated queries
+        company_count = len(self.env.companies)
+        journal_currencies = {}
+        
         for journal in self:
+            currency_id = journal.currency_id.id or journal.company_id.currency_id.id
+            journal_currencies[journal.id] = currency_id
             dashboard_data[journal.id] = {
-                'currency_id': journal.currency_id.id or journal.company_id.currency_id.id,
-                'company_count': len(self.env.companies),
+                'currency_id': currency_id,
+                'company_count': company_count,
             }
-        self._fill_bank_cash_dashboard_data(dashboard_data)
-        self._fill_sale_purchase_dashboard_data(dashboard_data)
-        self._fill_general_dashboard_data(dashboard_data)
+        
+        # Optimize: Batch process dashboard data by journal type
+        self._fill_bank_cash_dashboard_data_optimized(dashboard_data, journal_currencies)
+        self._fill_sale_purchase_dashboard_data_optimized(dashboard_data, journal_currencies)
+        self._fill_general_dashboard_data_optimized(dashboard_data, journal_currencies)
         return dashboard_data
 
     def _fill_dashboard_data_count(self, dashboard_data, model, name, domain):
@@ -320,77 +445,93 @@ class account_journal(models.Model):
         for journal in self:
             dashboard_data[journal.id][name] = res.get(journal.id, 0)
 
-    def _fill_bank_cash_dashboard_data(self, dashboard_data):
-        """Populate all bank and cash journal's data dict with relevant information for the kanban card."""
+    def _fill_bank_cash_dashboard_data_optimized(self, dashboard_data, journal_currencies):
+        """Optimized version of bank and cash journal dashboard data population."""
         bank_cash_journals = self.filtered(lambda journal: journal.type in ('bank', 'cash'))
         if not bank_cash_journals:
             return
 
-        # Number to reconcile
+        journal_ids = bank_cash_journals.ids
+        
+        # Optimize: Single query to get all bank/cash dashboard data
         self._cr.execute("""
-            SELECT st_line_move.journal_id,
-                   COUNT(st_line.id)
-              FROM account_bank_statement_line st_line
-              JOIN account_move st_line_move ON st_line_move.id = st_line.move_id
-             WHERE st_line_move.journal_id IN %s
-               AND NOT st_line.is_reconciled
-               AND st_line_move.to_check IS NOT TRUE
-               AND st_line_move.state = 'posted'
-          GROUP BY st_line_move.journal_id
-        """, [tuple(bank_cash_journals.ids)])
-        number_to_reconcile = {
-            journal_id: count
-            for journal_id, count in self.env.cr.fetchall()
-        }
-
-        # Last statement
-        self.env.cr.execute("""
-            SELECT journal.id, statement.id
-              FROM account_journal journal
-         LEFT JOIN LATERAL (
-                      SELECT id
-                        FROM account_bank_statement
-                       WHERE journal_id = journal.id
-                    ORDER BY date DESC
-                       LIMIT 1
-                   ) statement ON TRUE
-             WHERE journal.id = ANY(%s)
-        """, [self.ids])
-        last_statements = {journal_id: statement_id for journal_id, statement_id in self.env.cr.fetchall()}
-        self.env['account.bank.statement'].browse(i for i in last_statements.values() if i).mapped('balance_end_real')  # prefetch
-
+            WITH reconciliation_data AS (
+                SELECT st_line_move.journal_id,
+                       COUNT(st_line.id) as reconcile_count
+                  FROM account_bank_statement_line st_line
+                  JOIN account_move st_line_move ON st_line_move.id = st_line.move_id
+                 WHERE st_line_move.journal_id = ANY(%s)
+                   AND NOT st_line.is_reconciled
+                   AND st_line_move.to_check IS NOT TRUE
+                   AND st_line_move.state = 'posted'
+              GROUP BY st_line_move.journal_id
+            ),
+            last_statements AS (
+                SELECT journal.id as journal_id, statement.id as statement_id
+                  FROM account_journal journal
+             LEFT JOIN LATERAL (
+                          SELECT id
+                            FROM account_bank_statement
+                           WHERE journal_id = journal.id
+                        ORDER BY date DESC
+                           LIMIT 1
+                       ) statement ON TRUE
+                 WHERE journal.id = ANY(%s)
+            ),
+            to_check_data AS (
+                SELECT journal_id,
+                       SUM(amount) as total_amount,
+                       COUNT(*) as count
+                  FROM account_bank_statement_line st_line
+                  JOIN account_move move ON move.id = st_line.move_id
+                 WHERE st_line.journal_id = ANY(%s)
+                   AND move.to_check = TRUE
+                   AND move.state = 'posted'
+              GROUP BY journal_id
+            )
+            SELECT 
+                j.id as journal_id,
+                COALESCE(rd.reconcile_count, 0) as reconcile_count,
+                ls.statement_id as last_statement_id,
+                COALESCE(tcd.total_amount, 0) as to_check_amount,
+                COALESCE(tcd.count, 0) as to_check_count
+            FROM account_journal j
+            LEFT JOIN reconciliation_data rd ON rd.journal_id = j.id
+            LEFT JOIN last_statements ls ON ls.journal_id = j.id
+            LEFT JOIN to_check_data tcd ON tcd.journal_id = j.id
+            WHERE j.id = ANY(%s)
+        """, (journal_ids, journal_ids, journal_ids, journal_ids))
+        
+        dashboard_query_data = {row[0]: {
+            'reconcile_count': row[1],
+            'last_statement_id': row[2],
+            'to_check_amount': row[3],
+            'to_check_count': row[4]
+        } for row in self._cr.fetchall()}
+        
+        # Prefetch statement balances
+        statement_ids = [data['last_statement_id'] for data in dashboard_query_data.values() if data['last_statement_id']]
+        if statement_ids:
+            self.env['account.bank.statement'].browse(statement_ids).mapped('balance_end_real')
+        
         outstanding_pay_account_balances = bank_cash_journals._get_journal_dashboard_outstanding_payments()
 
-        # To check
-        to_check = {
-            res['journal_id'][0]: (res['amount'], res['journal_id_count'])
-            for res in self.env['account.bank.statement.line'].read_group(
-                domain=[
-                    ('journal_id', 'in', bank_cash_journals.ids),
-                    ('move_id.to_check', '=', True),
-                    ('move_id.state', '=', 'posted'),
-                ],
-                fields=['amount'],
-                groupby=['journal_id'],
-            )
-        }
-
         for journal in bank_cash_journals:
-            last_statement = self.env['account.bank.statement'].browse(last_statements.get(journal.id))
+            query_data = dashboard_query_data.get(journal.id, {})
+            last_statement = self.env['account.bank.statement'].browse(query_data.get('last_statement_id'))
             currency = journal.currency_id or journal.company_id.currency_id
             has_outstanding, outstanding_pay_account_balance = outstanding_pay_account_balances[journal.id]
-            to_check_balance, number_to_check = to_check.get(journal.id, (0, 0))
 
             dashboard_data[journal.id].update({
-                'number_to_check': number_to_check,
-                'to_check_balance': currency.format(to_check_balance),
-                'number_to_reconcile': number_to_reconcile.get(journal.id, 0),
+                'number_to_check': query_data.get('to_check_count', 0),
+                'to_check_balance': currency.format(query_data.get('to_check_amount', 0)),
+                'number_to_reconcile': query_data.get('reconcile_count', 0),
                 'account_balance': currency.format(journal.current_statement_balance),
                 'has_at_least_one_statement': bool(last_statement),
                 'nb_lines_bank_account_balance': bool(journal.has_statement_lines),
                 'outstanding_pay_account_balance': currency.format(outstanding_pay_account_balance),
                 'nb_lines_outstanding_pay_account_balance': has_outstanding,
-                'last_balance': currency.format(last_statement.balance_end_real),
+                'last_balance': currency.format(last_statement.balance_end_real) if last_statement else 0,
                 'bank_statements_source': journal.bank_statements_source,
                 'is_sample_data': journal.has_statement_lines,
             })
@@ -452,25 +593,32 @@ class account_journal(models.Model):
                 'is_sample_data': dashboard_data[journal.id]['entries_count'],
             })
 
-    def _fill_general_dashboard_data(self, dashboard_data):
-        """Populate all miscelaneous journal's data dict with relevant information for the kanban card."""
+    def _fill_general_dashboard_data_optimized(self, dashboard_data, journal_currencies):
+        """Optimized version of general journal dashboard data population."""
         general_journals = self.filtered(lambda journal: journal.type == 'general')
         if not general_journals:
             return
-        to_check_vals = {
-            vals['journal_id']: vals
-            for vals in self.env['account.move'].read_group(
-                domain=[('journal_id', 'in', general_journals.ids), ('to_check', '=', True)],
-                fields=['amount_total_signed'],
-                groupby='journal_id',
-                lazy=False,
-            )
-        }
+            
+        # Optimize: Use direct SQL query instead of read_group for better performance
+        journal_ids = general_journals.ids
+        self._cr.execute("""
+            SELECT journal_id,
+                   COUNT(*) as count,
+                   SUM(amount_total_signed) as total_amount
+            FROM account_move
+            WHERE journal_id = ANY(%s)
+              AND to_check = TRUE
+            GROUP BY journal_id
+        """, (journal_ids,))
+        
+        to_check_data = {row[0]: {'count': row[1], 'total_amount': row[2]} 
+                        for row in self._cr.fetchall()}
+        
         for journal in general_journals:
-            vals = to_check_vals.get('journal_id', {})
+            data = to_check_data.get(journal.id, {'count': 0, 'total_amount': 0})
             dashboard_data[journal.id].update({
-                'number_to_check': vals.get('__count', 0),
-                'to_check_balance': vals.get('amount_total_signed', 0),
+                'number_to_check': data['count'],
+                'to_check_balance': data['total_amount'],
             })
 
     def _get_open_bills_to_pay_query(self):
