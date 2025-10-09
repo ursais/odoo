@@ -260,9 +260,23 @@ class BaseAutomation(models.Model):
         if actions is None:
             actions = self.with_context(active_test=True).search([('trigger', '=', 'on_time')])
 
-        # Minimum 1 minute, maximum 4 hours, 10% tolerance
-        delay = min(actions.mapped(get_delay), default=0)
-        return min(max(1, delay // 10), 4 * 60) if delay else 4 * 60
+        # Use a more reliable calculation: cron should run at least as frequently as the shortest interval
+        if not actions:
+            return 4 * 60  # Default to 4 hours if no actions
+
+        # Get the minimum delay from all time-based actions
+        delays = actions.mapped(get_delay)
+        min_delay = min(delays) if delays else 0
+        
+        # Use a more reliable calculation: cron should run at least as frequently as the shortest interval
+        # but not more frequently than every minute, and not less frequently than every 4 hours
+        if min_delay <= 0:
+            return 4 * 60  # Default to 4 hours if no valid delay
+        
+        # Ensure cron runs at least as frequently as the shortest action interval
+        # but cap it at reasonable limits (1 minute minimum, 4 hours maximum)
+        cron_interval = min(max(1, min_delay), 4 * 60)
+        return cron_interval
 
     def _compute_least_delay_msg(self):
         msg = _("Note that this action can be triggered up to %d minutes after its schedule.")
