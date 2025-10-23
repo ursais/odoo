@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.auth.session.management</field>
+        <field name="model">res.config.settings</field>
+        <field name="priority" eval="16"/>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                <div class="app_settings_block" data-string="Session Management" string="Session Management" data-key="auth_session_management">
+                    <h2>Advanced Session Management</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="preserve_oauth_sessions"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="preserve_oauth_sessions"/>
+                                <div class="text-muted">
+                                    Prevents OAuth users from being logged out when passwords are reset externally.
+                                    This fixes the "forced login" and "timeout" issues with MSFT SSO.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="preserve_ldap_sessions"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="preserve_ldap_sessions"/>
+                                <div class="text-muted">
+                                    Prevents LDAP users from being logged out when passwords are reset externally.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="session_timeout_warning"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="session_timeout_warning"/>
+                                <div class="text-muted">
+                                    Show warning to users when session is about to expire (in minutes).
+                                    Set to 0 to disable warnings.
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_left_pane">
+                                <field name="enable_session_debug"/>
+                            </div>
+                            <div class="o_setting_right_pane">
+                                <label for="enable_session_debug"/>
+                                <div class="text-muted">
+                                    Enable detailed logging for session management operations.
+                                    Useful for troubleshooting authentication issues.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>

@@ -1,0 +1,3 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_auth_session_management_res_users,auth_session_management.res_users,base.model_res_users,base.group_user,1,1,0,0
+access_auth_session_management_res_config_settings,auth_session_management.res_config_settings,base.model_res_config_settings,base.group_system,1,1,1,1
