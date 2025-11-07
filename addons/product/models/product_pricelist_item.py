@@ -108,7 +108,9 @@ class PricelistItem(models.Model):
              " in order to show discount to customer.",
         index=True, default='fixed', required=True)
 
-    fixed_price = fields.Float(string="Fixed Price", digits='Product Price')
+    #fixed_price = fields.Float(string="Fixed Price", digits='Product Price')
+    fixed_price = fields.Float(string="Fixed Price")
+    
     percent_price = fields.Float(
         string="Percentage Price",
         help="You can apply a mark-up by setting a negative discount.")
