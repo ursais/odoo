@@ -1,0 +1,28 @@
+/** @odoo-module */
+
+import { registry } from "@web/core/registry";
+import { SpreadsheetCollaborativeChannel } from "./spreadsheet_collaborative_channel";
+
+/**
+ * Creates a channel to handle collaborative edition of a spreadsheet.
+ * This service uses the fixed SpreadsheetCollaborativeChannel that ensures
+ * save status only updates after server confirms data persistence.
+ */
+const spreadsheetCollaborativeService = {
+    dependencies: SpreadsheetCollaborativeChannel.dependencies,
+    start(env, dependencies) {
+        return {
+            makeCollaborativeChannel(resModel, resId, shareId, accessToken) {
+                return new SpreadsheetCollaborativeChannel(
+                    env,
+                    resModel,
+                    resId,
+                    shareId,
+                    accessToken
+                );
+            },
+        };
+    },
+};
+
+registry.category("services").add("spreadsheet_collaborative", spreadsheetCollaborativeService);
