@@ -289,6 +289,11 @@ class ir_cron(models.Model):
         # 3: now
         # 4: future_nextcall, the cron nextcall as seen from now
 
+        if job['interval_number'] <= 0:
+            _logger.error("Job %s %r has been disabled because its interval number is null or negative.", job['id'], job['cron_name'])
+            cron_cr.execute("UPDATE ir_cron SET active=false WHERE id=%s", [job['id']])
+            return
+
         with cls.pool.cursor() as job_cr:
             lastcall = fields.Datetime.to_datetime(job['lastcall'])
             interval = _intervalTypes[job['interval_type']](job['interval_number'])
@@ -345,8 +350,6 @@ class ir_cron(models.Model):
             WHERE cron_id = %s
               AND call_at < (now() at time zone 'UTC')
         """, [job['id']])
-
-        cron_cr.commit()
 
     @api.model
     def _callback(self, cron_name, server_action_id, job_id):
