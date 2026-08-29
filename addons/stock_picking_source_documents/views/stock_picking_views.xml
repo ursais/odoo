@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="vpicktree_inherit_source_documents" model="ir.ui.view">
+        <field name="name">stock.picking.tree.source.documents</field>
+        <field name="model">stock.picking</field>
+        <field name="inherit_id" ref="stock.vpicktree"/>
+        <field name="arch" type="xml">
+            <!-- Keep the raw single-value origin available but hidden by
+                 default, and show the aggregated source documents instead.
+                 The origin field is preserved (not removed) so that other
+                 views inheriting it keep working. -->
+            <field name="origin" position="attributes">
+                <attribute name="optional">hide</attribute>
+            </field>
+            <field name="origin" position="after">
+                <field name="source_document_list" string="Source Document" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>
