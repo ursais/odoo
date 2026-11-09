@@ -3536,18 +3536,24 @@ class BaseModel(metaclass=MetaModel):
         :raise AccessError: if the user is not allowed to delete all the given records
         :raise UserError: if the record is default property for other records
         """
+#        _unlink.info(f"Step 1 {self}")
         if not self:
+#            _unlink.info("Not self returning")
             return True
 
+#        _unlink.info(f"Checking access right {self}")
         self.check_access_rights('unlink')
+#        _unlink.info(f"Checking access rule {self}")
         self.check_access_rule('unlink')
+#        _unlink.info(f"Security check Passed {self}")
 
         from odoo.addons.base.models.ir_model import MODULE_UNINSTALL_FLAG
+#        _unlink.info(f"Import module uninstall flag {self}")
         for func in self._ondelete_methods:
             # func._ondelete is True if it should be called during uninstallation
             if func._ondelete or not self._context.get(MODULE_UNINSTALL_FLAG):
                 func(self)
-
+#        _unlink.info(f"Remove compute field value {self}")
         # TOFIX: this avoids an infinite loop when trying to recompute a
         # field, which triggers the recomputation of another field using the
         # same compute function, which then triggers again the computation
@@ -3555,8 +3561,18 @@ class BaseModel(metaclass=MetaModel):
         for field in self._fields.values():
             self.env.remove_to_compute(field, self)
 
-        self.env.flush_all()
+#        _unlink.info(f"Flushing started {self}")
+        try:
+#            ids = self.ids if self._name == 'account.analytic.line' else False
+            self.env.flush_all()
+#           _unlink.info(f"Flushing ended {self}")
+        except Exception as e:
+#            _unlink.info(f"Error while flushing {self}")
+#            _unlink.info(f"error {e}")
+            from odoo.exceptions import UserError
+            raise UserError("You cannot do this operation")
 
+#        _unlink.info(f"Executing Database queries {self}")
         cr = self._cr
         Data = self.env['ir.model.data'].sudo().with_context({})
         Defaults = self.env['ir.default'].sudo()
@@ -3571,12 +3587,14 @@ class BaseModel(metaclass=MetaModel):
         with self.env.protecting(self._fields.values(), self):
             self.modified(self._fields, before=True)
 
+#        _unlink.info(f"Trying to delete split conditions {self}")
         for sub_ids in cr.split_for_in_conditions(self.ids):
             records = self.browse(sub_ids)
 
             # Check if the records are used as default properties.
             refs = [f'{self._name},{id_}' for id_ in sub_ids]
             if Property.search([('res_id', '=', False), ('value_reference', 'in', refs)], limit=1):
+#                _unlink.info("Unable to delete document is used as default property")
                 raise UserError(_('Unable to delete this document because it is used as a default property'))
 
             # Delete the records' properties.
@@ -3607,6 +3625,7 @@ class BaseModel(metaclass=MetaModel):
             cr.execute(query, (self._name, sub_ids))
             ir_attachment_unlink |= Attachment.browse(row[0] for row in cr.fetchall())
 
+#        _unlink.info(f"Attachment deleted flushing {self}")
         # invalidate the *whole* cache, since the orm does not handle all
         # changes made in the database, like cascading delete!
         self.env.invalidate_all(flush=False)
@@ -3623,7 +3642,9 @@ class BaseModel(metaclass=MetaModel):
         # auditing: deletions are infrequent and leave no trace in the database
         _unlink.info('User #%s deleted %s records with IDs: %r', self._uid, self._name, self.ids)
 
+#       _unlink.info(f"Step Last {self}")
         return True
+
 
     def write(self, vals):
         """ write(vals)
@@ -6196,6 +6217,8 @@ class BaseModel(metaclass=MetaModel):
         # do not force recomputation on new records; those will be
         # recomputed by accessing the field on the records
         records = self.browse(tuple(id_ for id_ in ids if id_))
+#        _logger.info(f"Recomputing records{len(records)} {field.name} - {field.model_name}")
+#        _logger.info(f"Ids {records.ids}")
         field.recompute(records)
 
     #

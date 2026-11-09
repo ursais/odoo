@@ -188,7 +188,7 @@ class MrpWorkorder(models.Model):
                 wo.json_popover = False
                 continue
             if wo.state in ('pending', 'waiting', 'ready'):
-                previous_wos = wo.blocked_by_workorder_ids
+                previous_wos = wo.blocked_by_workorder_ids.filtered(lambda wr : wr.date_planned_start)
                 prev_start = min([workorder.date_planned_start for workorder in previous_wos]) if previous_wos else False
                 prev_finished = max([workorder.date_planned_finished for workorder in previous_wos]) if previous_wos else False
                 if wo.state == 'pending' and prev_start and not (prev_start > wo.date_planned_start):

@@ -30,6 +30,10 @@ from odoo.tools import (
     sql
 )
 
+import logging
+
+_logger = logging.getLogger(__name__)
+
 
 MAX_HASH_VERSION = 3
 
@@ -569,6 +573,7 @@ class AccountMove(models.Model):
     # -------------------------------------------------------------------------
 
     def _compute_payment_reference(self):
+        _logger.info("--------------------_compute_payment_reference-----------------")
         for move in self.filtered(lambda m: (
             m.state == 'posted'
             and m.move_type == 'out_invoice'
@@ -579,6 +584,7 @@ class AccountMove(models.Model):
 
     @api.depends('invoice_date', 'company_id')
     def _compute_date(self):
+        _logger.info("--------------------_compute_date-----------------")
         for move in self:
             if not move.invoice_date:
                 if not move.date:
@@ -594,18 +600,21 @@ class AccountMove(models.Model):
 
     @api.depends('auto_post')
     def _compute_auto_post_until(self):
+        _logger.info("--------------------_compute_auto_post_util-----------------")
         for record in self:
             if record.auto_post in ('no', 'at_date'):
                 record.auto_post_until = False
 
     @api.depends('date', 'auto_post')
     def _compute_hide_post_button(self):
+        _logger.info("--------------------_compute_hide_post_button-----------------")
         for record in self:
             record.hide_post_button = record.state != 'draft' \
                 or record.auto_post != 'no' and record.date > fields.Date.today()
 
     @api.depends('journal_id')
     def _compute_company_id(self):
+        _logger.info("--------------------_compute_company_id-----------------")
         for move in self:
             company_id = move.journal_id.company_id or self.env.company
             if company_id != move.company_id:
@@ -613,6 +622,7 @@ class AccountMove(models.Model):
 
     @api.depends('move_type')
     def _compute_journal_id(self):
+        _logger.info("--------------------_compute_jounral_id-----------------")
         for record in self.filtered(lambda r: r.journal_id.type not in r._get_valid_journal_types()):
             record.journal_id = record._search_default_journal()
 
@@ -663,11 +673,13 @@ class AccountMove(models.Model):
 
     @api.depends('move_type')
     def _compute_is_storno(self):
+        _logger.info("--------------------_compute_is_storno-----------------")
         for move in self:
             move.is_storno = move.is_storno or (move.move_type in ('out_refund', 'in_refund') and move.company_id.account_storno)
 
     @api.depends('company_id', 'invoice_filter_type_domain')
     def _compute_suitable_journal_ids(self):
+        _logger.info("--------------------_compute_suitable_journal_ids-----------------")
         for m in self:
             journal_type = m.invoice_filter_type_domain or 'general'
             company_id = m.company_id.id or self.env.company.id
@@ -676,6 +688,7 @@ class AccountMove(models.Model):
 
     @api.depends('posted_before', 'state', 'journal_id', 'date')
     def _compute_name(self):
+        _logger.info("--------------------_compute_name-----------------")
         self = self.sorted(lambda m: (m.date, m.ref or '', m.id))
 
         for move in self:
@@ -703,11 +716,13 @@ class AccountMove(models.Model):
 
     @api.depends('journal_id', 'date')
     def _compute_highest_name(self):
+        _logger.info("--------------------_compute_highest_name-----------------")
         for record in self:
             record.highest_name = record._get_last_sequence(lock=False)
 
     @api.depends('name', 'journal_id')
     def _compute_made_sequence_hole(self):
+        _logger.info("--------------------_compute_made_sequence_hole-----------------")
         self.env.cr.execute("""
             SELECT this.id
               FROM account_move this
@@ -728,6 +743,7 @@ class AccountMove(models.Model):
 
     @api.depends('move_type')
     def _compute_type_name(self):
+        _logger.info("--------------------_compute_type_name-----------------")
         type_name_mapping = dict(
             self._fields['move_type']._description_selection(self.env),
             out_invoice=_('Invoice'),
@@ -739,6 +755,7 @@ class AccountMove(models.Model):
 
     @api.depends('line_ids.account_id.account_type')
     def _compute_always_tax_exigible(self):
+        _logger.info("--------------------_compute_always_tax_exigible-----------------")
         for record in self:
             # We need to check is_invoice as well because always_tax_exigible is used to
             # set the tags as well, during the encoding. So, if no receivable/payable
@@ -749,11 +766,13 @@ class AccountMove(models.Model):
 
     @api.depends('partner_id')
     def _compute_commercial_partner_id(self):
+        _logger.info("--------------------_compute_commercial_partner_id-----------------")
         for move in self:
             move.commercial_partner_id = move.partner_id.commercial_partner_id
 
     @api.depends('partner_id')
     def _compute_partner_shipping_id(self):
+        _logger.info("--------------------_compute_partner_shipping_id-----------------")
         for move in self:
             if move.is_invoice(include_receipts=True):
                 addr = move.partner_id.address_get(['delivery'])
@@ -763,6 +782,7 @@ class AccountMove(models.Model):
 
     @api.depends('partner_id', 'partner_shipping_id', 'company_id')
     def _compute_fiscal_position_id(self):
+        _logger.info("--------------------_compute_fiscal_position_id-----------------")
         for move in self:
             delivery_partner = self.env['res.partner'].browse(
                 move.partner_shipping_id.id
@@ -773,6 +793,7 @@ class AccountMove(models.Model):
 
     @api.depends('bank_partner_id')
     def _compute_partner_bank_id(self):
+        _logger.info("--------------------_compute_parnter_bank_id-----------------")
         for move in self:
             bank_ids = move.bank_partner_id.bank_ids.filtered(
                 lambda bank: not bank.company_id or bank.company_id == move.company_id)
@@ -780,6 +801,7 @@ class AccountMove(models.Model):
 
     @api.depends('partner_id')
     def _compute_invoice_payment_term_id(self):
+        _logger.info("--------------------_compute_invocie_payment_term_id-----------------")
         for move in self:
             if move.is_sale_document(include_receipts=True) and move.partner_id.property_payment_term_id:
                 move.invoice_payment_term_id = move.partner_id.property_payment_term_id
@@ -790,15 +812,20 @@ class AccountMove(models.Model):
 
     @api.depends('needed_terms')
     def _compute_invoice_date_due(self):
+        _logger.info("--------------------_compute_invoice_date_due-----------------")
         today = fields.Date.context_today(self)
         for move in self:
+            _logger.info(f"Compute started for move {move.id}")
             move.invoice_date_due = move.needed_terms and max(
                 (k['date_maturity'] for k in move.needed_terms.keys() if k),
                 default=False,
             ) or move.invoice_date_due or today
+            _logger.info(f"Compute ended for move {move.id}")
+
 
     @api.depends('journal_id', 'statement_line_id')
     def _compute_currency_id(self):
+        _logger.info("--------------------_compute_currency_id-----------------")
         for invoice in self:
             currency = (
                 invoice.statement_line_id.foreign_currency_id
@@ -810,6 +837,7 @@ class AccountMove(models.Model):
 
     @api.depends('move_type')
     def _compute_direction_sign(self):
+        _logger.info("--------------------_compute_direction_sign-----------------")
         for invoice in self:
             if invoice.move_type == 'entry' or invoice.is_outbound():
                 invoice.direction_sign = 1
@@ -832,6 +860,7 @@ class AccountMove(models.Model):
         'line_ids.full_reconcile_id',
         'state')
     def _compute_amount(self):
+        _logger.info("--------------------_compute_amount-----------------")
         for move in self:
             total_untaxed, total_untaxed_currency = 0.0, 0.0
             total_tax, total_tax_currency = 0.0, 0.0
@@ -876,6 +905,7 @@ class AccountMove(models.Model):
 
     @api.depends('amount_residual', 'move_type', 'state', 'company_id')
     def _compute_payment_state(self):
+        _logger.info("--------------------_compute_payment_state-----------------")
         stored_ids = tuple(self.ids)
         if stored_ids:
             self.env['account.partial.reconcile'].flush_model()
@@ -967,6 +997,7 @@ class AccountMove(models.Model):
 
     @api.depends('invoice_payment_term_id', 'invoice_date', 'currency_id', 'amount_total_in_currency_signed', 'invoice_date_due')
     def _compute_needed_terms(self):
+        _logger.info("--------------------_compute_needed_terms-----------------")
         for invoice in self:
             is_draft = invoice.id != invoice._origin.id
             invoice.needed_terms = {}
@@ -1030,6 +1061,7 @@ class AccountMove(models.Model):
                     }
 
     def _compute_payments_widget_to_reconcile_info(self):
+        _logger.info("--------------------_compute_payments_widget_to_reconcile_info-----------------")
         for move in self:
             move.invoice_outstanding_credits_debits_widget = False
             move.invoice_has_outstanding = False
@@ -1094,6 +1126,7 @@ class AccountMove(models.Model):
 
     @api.depends('move_type', 'line_ids.amount_residual')
     def _compute_payments_widget_reconciled_info(self):
+        _logger.info("--------------------_compute_payments_widget_reconciled_info-----------------")
         for move in self:
             payments_widget_vals = {'title': _('Less Payment'), 'outstanding': False, 'content': []}
 
@@ -1148,6 +1181,7 @@ class AccountMove(models.Model):
         """ Computed field used for custom widget's rendering.
             Only set on invoices.
         """
+        _logger.info("--------------------_compute_tax_totals-----------------")
         for move in self:
             if move.is_invoice(include_receipts=True):
                 base_lines = move.invoice_line_ids.filtered(lambda line: line.display_type == 'product')
@@ -1236,6 +1270,7 @@ class AccountMove(models.Model):
         '''
         Returns an [] containing the payment term's information to be displayed on the invoice's PDF.
         '''
+        _logger.info("--------------------_compute_payment_term_details-----------------")
         for invoice in self:
             invoice.payment_term_details = False
             if invoice.show_payment_term_details:
@@ -1252,6 +1287,7 @@ class AccountMove(models.Model):
 
     @api.depends('move_type', 'payment_state', 'invoice_payment_term_id')
     def _compute_show_payment_term_details(self):
+        _logger.info("--------------------_compute_show_payment_term_details-----------------")
         '''
         Determines :
         - whether or not an additional table should be added at the end of the invoice to display the various
@@ -1268,6 +1304,7 @@ class AccountMove(models.Model):
 
     @api.depends('partner_id', 'invoice_source_email', 'partner_id.name')
     def _compute_invoice_partner_display_info(self):
+        _logger.info("--------------------_compute_invoice_partner_display_info-----------------")
         for move in self:
             vendor_display_name = move.partner_id.display_name
             if not vendor_display_name:
@@ -1279,6 +1316,7 @@ class AccountMove(models.Model):
 
     @api.depends('move_type')
     def _compute_invoice_filter_type_domain(self):
+        _logger.info("--------------------_compute_invoice_filter_type_domian-----------------")
         for move in self:
             if move.is_sale_document(include_receipts=True):
                 move.invoice_filter_type_domain = 'sale'
@@ -1289,6 +1327,7 @@ class AccountMove(models.Model):
 
     @api.depends('commercial_partner_id')
     def _compute_bank_partner_id(self):
+        _logger.info("--------------------_compute_bank_partner_id-----------------")
         for move in self:
             if move.is_inbound():
                 move.bank_partner_id = move.company_id.partner_id
@@ -1298,6 +1337,7 @@ class AccountMove(models.Model):
     @api.depends('date', 'line_ids.debit', 'line_ids.credit', 'line_ids.tax_line_id', 'line_ids.tax_ids', 'line_ids.tax_tag_ids',
                  'invoice_line_ids.debit', 'invoice_line_ids.credit', 'invoice_line_ids.tax_line_id', 'invoice_line_ids.tax_ids', 'invoice_line_ids.tax_tag_ids')
     def _compute_tax_lock_date_message(self):
+        _logger.info("--------------------_compute_tax_lock_date_message-----------------")
         for move in self:
             accounting_date = move.date or fields.Date.context_today(move)
             affects_tax_report = move._affect_tax_report()
@@ -1310,6 +1350,7 @@ class AccountMove(models.Model):
 
     @api.depends('company_id.account_fiscal_country_id', 'fiscal_position_id', 'fiscal_position_id.country_id', 'fiscal_position_id.foreign_vat')
     def _compute_tax_country_id(self):
+        _logger.info("--------------------_compute_tax_country_id-----------------")
         for record in self:
             if record.fiscal_position_id.foreign_vat:
                 record.tax_country_id = record.fiscal_position_id.country_id
@@ -1318,11 +1359,13 @@ class AccountMove(models.Model):
 
     @api.depends('tax_country_id')
     def _compute_tax_country_code(self):
+        _logger.info("--------------------_compute_tax_country_code-----------------")
         for record in self:
             record.tax_country_code = record.tax_country_id.code
 
     @api.depends('line_ids')
     def _compute_has_reconciled_entries(self):
+        _logger.info("--------------------_compute_has_reconciled_entries-----------------")
         for move in self:
             move.has_reconciled_entries = len(move.line_ids._reconciled_lines()) > 1
 
@@ -1334,11 +1377,13 @@ class AccountMove(models.Model):
     # EXTENDS portal portal.mixin
     def _compute_access_url(self):
         super()._compute_access_url()
+        _logger.info("--------------------_compute_compute_access_url-----------------")
         for move in self.filtered(lambda move: move.is_invoice()):
             move.access_url = '/my/invoices/%s' % (move.id)
 
     @api.depends('move_type', 'partner_id', 'company_id')
     def _compute_narration(self):
+        _logger.info("--------------------_compute_narration-----------------")
         use_invoice_terms = self.env['ir.config_parameter'].sudo().get_param('account.use_invoice_terms')
         for move in self:
             if not move.is_sale_document(include_receipts=True):
@@ -1358,6 +1403,7 @@ class AccountMove(models.Model):
 
     @api.depends('company_id', 'partner_id', 'tax_totals', 'currency_id')
     def _compute_partner_credit_warning(self):
+        _logger.info("--------------------_compute_partner_credit_warning-----------------")
         for move in self:
             move.with_company(move.company_id)
             move.partner_credit_warning = ''
@@ -1389,6 +1435,7 @@ class AccountMove(models.Model):
 
     @api.depends('journal_id.type', 'company_id')
     def _compute_quick_edit_mode(self):
+        _logger.info("--------------------_compute_quick_edit_mode-----------------")
         for move in self:
             quick_edit_mode = move.company_id.quick_edit_mode
             if move.journal_id.type == 'sale':
@@ -1400,11 +1447,13 @@ class AccountMove(models.Model):
 
     @api.depends('quick_edit_total_amount', 'invoice_line_ids.price_total', 'tax_totals')
     def _compute_quick_encoding_vals(self):
+        _logger.info("--------------------_compute_quick_encoding_vals-----------------")
         for move in self:
             move.quick_encoding_vals = move._get_quick_edit_suggestions()
 
     @api.depends('ref', 'move_type', 'partner_id', 'invoice_date')
     def _compute_duplicated_ref_ids(self):
+        _logger.info("--------------------_compute_duplicated_ref_ids-----------------")
         move_to_duplicate_move = self._fetch_duplicate_supplier_reference()
         for move in self:
             move.duplicated_ref_ids = move_to_duplicate_move.get(move, self.env['account.move'])
@@ -1459,6 +1508,7 @@ class AccountMove(models.Model):
 
     @api.depends('company_id')
     def _compute_display_qr_code(self):
+        _logger.info("--------------------_compute_display_qr_code-----------------")
         for record in self:
             record.display_qr_code = (
                 record.move_type in ('out_invoice', 'out_receipt', 'in_invoice', 'in_receipt')

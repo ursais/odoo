@@ -79,7 +79,7 @@ class SequenceMixin(models.AbstractModel):
                 continue
             date = fields.Date.to_date(record[record._sequence_date_field])
             sequence = record[record._sequence_field]
-            if (
+            '''if (
                 sequence
                 and date
                 and date > constraint_date
@@ -94,7 +94,7 @@ class SequenceMixin(models.AbstractModel):
                     date_field=record._fields[record._sequence_date_field]._description_string(self.env),
                     sequence_field=record._fields[record._sequence_field]._description_string(self.env),
                     model=self.env['ir.model']._get(record._name).display_name,
-                ))
+                ))'''
 
     @api.depends(lambda self: [self._sequence_field])
     def _compute_split_sequence(self):

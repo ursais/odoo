@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 # Part of Odoo. See LICENSE file for full copyright and licensing details.
 
@@ -727,16 +728,37 @@ class Environment(Mapping):
             self.flush_all()
         self.cache.invalidate()
 
-    def _recompute_all(self):
+    def _recompute_all(self, ids=None):
         """ Process all pending computations. """
+#        if ids:
+#            _logger.info(f"{ids} Recomputing {self.fields_to_compute()}")
         for field in list(self.fields_to_compute()):
+#            if ids:
+#                _logger.info("======================================")
+#                _logger.info(f"{ids} Computing {field.name} model {field.model_name} started")
             self[field.model_name]._recompute_field(field)
+#            if ids:
+#                _logger.info(f"{ids} Computing {field.name} model {field.model_name} completed")
+#                _logger.info(":::::::::::::::::::::::::::::::::::::::::")
 
-    def flush_all(self):
+    def flush_all(self, ids=None):
         """ Flush all pending computations and updates to the database. """
-        self._recompute_all()
+#        if ids:
+#            _logger.info(f"Flushing recompute started {ids}")
+        self._recompute_all(ids)
+#        if ids:
+#            _logger.info(f"Flushing recompute completed {ids}")
+
         for model_name in OrderedSet(field.model_name for field in self.cache.get_dirty_fields()):
-            self[model_name].flush_model()
+#            if ids:
+#                _logger.info(f"Flushing model {model_name} started {ids}")
+#                self[model_name].flush_model()
+#                _logger.info(f"Flushing model {model_name} complete {ids}")
+#            else:
+#                self[model_name].flush_model()
+             self[model_name].flush_model()
+
+
 
     def is_protected(self, field, record):
         """ Return whether `record` is protected against invalidation or
